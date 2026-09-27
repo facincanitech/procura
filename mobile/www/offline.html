@@ -1,0 +1,41 @@
+<!doctype html>
+<!-- Página empacotada no APK, exibida (server.errorPath) quando o app publicado não abre. -->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1512">
+<title>Procura — sem conexão</title>
+<style>
+  :root{color-scheme:dark;--bg:#0f1512;--panel:#18201c;--line:#2f3b35;--ink:#eef3ef;--muted:#9aaba2;--accent:#ffcf3f;--accent-ink:#1b1600}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{display:grid;place-items:center;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:24px;text-align:center}
+  .card{max-width:360px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:28px 22px;display:flex;flex-direction:column;gap:14px}
+  .logo{font:700 30px/1 system-ui;letter-spacing:-.03em}.logo b{color:var(--accent)}
+  h1{font-size:20px;margin:0}
+  p{margin:0;color:var(--muted)}
+  button{border:0;border-radius:14px;padding:14px;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:16px}
+  button:disabled{opacity:.6}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">procur<b>a</b></div>
+    <h1>Sem conexão</h1>
+    <p>O Procura precisa de internet para identificar produtos e mostrar onde comprar.</p>
+    <button id="retry" type="button">Tentar de novo</button>
+  </div>
+<script>
+  const APP = "https://facincanitech.github.io/procura/app/";
+  const btn = document.getElementById("retry");
+  async function tentar(){
+    btn.disabled = true; btn.textContent = "Conectando…";
+    try { await fetch(APP + "?t=" + Date.now(), { mode: "no-cors", cache: "no-store" }); location.replace(APP); }
+    catch { btn.disabled = false; btn.textContent = "Tentar de novo"; }
+  }
+  btn.onclick = tentar;
+  window.addEventListener("online", tentar);
+</script>
+</body>
+</html>

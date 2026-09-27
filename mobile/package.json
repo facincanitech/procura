@@ -1,0 +1,17 @@
+{
+  "name": "procura-mobile",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Casca Android do Procura: carrega o app publicado em facincanitech.github.io/procura/app/",
+  "scripts": {
+    "sync": "cap sync android",
+    "open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.2"
+  }
+}

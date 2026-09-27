@@ -1,0 +1,12 @@
+{
+  "appId": "com.facincanitech.procura",
+  "appName": "Procura",
+  "webDir": "www",
+  "server": {
+    "url": "https://facincanitech.github.io/procura/app/",
+    "cleartext": false,
+    "errorPath": "offline.html",
+    "allowNavigation": ["localhost"]
+  },
+  "android": { "allowMixedContent": false }
+}

@@ -2,7 +2,17 @@
 *teste-andre*.html
 *-pronto.html
 .env
+.env.*
 
-# documentação e banco ficam só na máquina (repo é público)
+# documentação, banco e rascunhos ficam só na máquina (repo é público)
 *.md
 supabase/
+_arquivo/
+
+# Android / Capacitor
+mobile/node_modules/
+*.apk
+*.aab
+*.jks
+*.keystore
+keystore.properties

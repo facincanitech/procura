@@ -1,0 +1,1148 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1512">
+<meta name="color-scheme" content="dark only">
+<title>Procura — câmera</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+:root{
+  --bg:#0f1512; --panel:#18201c; --panel2:#212b26; --line:#2f3b35;
+  --ink:#eef3ef; --muted:#9aaba2; --accent:#ffcf3f; --accent-ink:#1b1600;
+  --ok:#5fd39a; --warn:#ff8a5c;
+  --display:"Bricolage Grotesque",system-ui,sans-serif;
+  --body:"Figtree",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark only;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);-webkit-tap-highlight-color:transparent}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{display:flex;flex-direction:column;height:100%;max-width:560px;margin:0 auto}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 10px}
+.logo{font:700 22px/1 var(--display);letter-spacing:-.02em}
+.logo b{color:var(--accent)}
+.tabs{display:flex;gap:4px;background:var(--panel);padding:4px;border-radius:999px}
+.tabs button{border:0;background:none;padding:6px 10px;border-radius:999px;color:var(--muted);font-size:13px;font-weight:600}
+.tabs button[aria-selected="true"]{background:var(--panel2);color:var(--ink)}
+
+main{flex:1;overflow-y:auto;padding:0 16px calc(env(safe-area-inset-bottom,0px) + 24px)}
+
+/* camera */
+.viewfinder{position:relative;border-radius:22px;overflow:hidden;background:#000;aspect-ratio:3/4;max-width:100%}
+.viewfinder video,.viewfinder img,.viewfinder canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.viewfinder .corners{position:absolute;inset:14%;pointer-events:none;
+  background:
+   linear-gradient(var(--accent),var(--accent)) top left/28px 3px no-repeat,
+   linear-gradient(var(--accent),var(--accent)) top left/3px 28px no-repeat,
+   linear-gradient(var(--accent),var(--accent)) top right/28px 3px no-repeat,
+   linear-gradient(var(--accent),var(--accent)) top right/3px 28px no-repeat,
+   linear-gradient(var(--accent),var(--accent)) bottom left/28px 3px no-repeat,
+   linear-gradient(var(--accent),var(--accent)) bottom left/3px 28px no-repeat,
+   linear-gradient(var(--accent),var(--accent)) bottom right/28px 3px no-repeat,
+   linear-gradient(var(--accent),var(--accent)) bottom right/3px 28px no-repeat;opacity:.9}
+.vf-msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;color:var(--muted)}
+.scanline{position:absolute;left:10%;right:10%;height:2px;background:var(--accent);box-shadow:0 0 16px var(--accent);top:20%;animation:scan 1.6s ease-in-out infinite alternate}
+@keyframes scan{to{top:80%}}
+@media (prefers-reduced-motion:reduce){.scanline{animation:none;top:50%}}
+
+.controls{display:flex;align-items:center;justify-content:space-between;padding:18px 8px 6px}
+.shutter{width:76px;height:76px;border-radius:50%;border:4px solid var(--ink);background:var(--accent);box-shadow:inset 0 0 0 4px var(--bg)}
+.shutter:disabled{opacity:.4}
+.ghost{border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:10px 12px;font-size:13px;font-weight:600;min-width:84px}
+.hint{text-align:center;color:var(--muted);font-size:13px;margin:4px 0 0}
+.model-status{display:none}
+
+/* results */
+.sheet{display:flex;flex-direction:column;gap:16px;margin-top:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px}
+.eyebrow{font:500 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 10px}
+.object-name{font:700 28px/1.1 var(--display);letter-spacing:-.02em;margin:0;text-wrap:balance}
+.object-alt{color:var(--muted);font-size:13px;margin-top:6px}
+.conf{display:inline-block;font:500 11px var(--mono);padding:3px 8px;border-radius:999px;background:var(--panel2);margin-top:10px}
+.conf.hi{color:var(--ok)} .conf.lo{color:var(--warn)}
+dl.attrs{display:grid;grid-template-columns:auto 1fr;gap:10px 14px;margin:0}
+dl.attrs dt{color:var(--muted);font-size:13px}
+dl.attrs dd{margin:0;font-weight:500;font-variant-numeric:tabular-nums;word-break:break-word}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.sw{display:flex;align-items:center;gap:6px;font-size:13px}
+.sw i{width:18px;height:18px;border-radius:6px;border:1px solid rgba(255,255,255,.2);display:inline-block}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--panel2);border-radius:999px;padding:5px 10px;font-size:13px}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+
+label.field{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+input.text,select.text{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>*{flex:1 1 140px}
+
+.primary{width:100%;border:0;border-radius:14px;padding:14px 16px;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:16px}
+.secondary{width:100%;border:1px solid var(--line);border-radius:14px;padding:13px 16px;background:var(--panel2);font-weight:600}
+
+.stores{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.store{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;background:var(--bg);border:1px solid var(--line);color:var(--ink);text-decoration:none}
+.store strong{font-weight:600}
+.store small{display:block;color:var(--muted);font-size:12px}
+.store .arrow{font:500 12px var(--mono);color:var(--accent);white-space:nowrap}
+
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:600;font-size:14px;z-index:9}
+
+.req{display:flex;flex-direction:column;gap:6px}
+.req h3{font:700 18px/1.2 var(--display);margin:0}
+.req .meta{font:500 12px var(--mono);color:var(--muted)}
+.req-actions{display:flex;gap:8px;margin-top:6px}
+.req-actions a,.req-actions button{font-size:13px;padding:7px 10px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);text-decoration:none}
+.empty{color:var(--muted);text-align:center;padding:40px 12px}
+.ai-box{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.ai-btn{width:100%;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:14px;padding:12px 14px;font-weight:700}
+.ai-btn:disabled{opacity:.5}
+.small{font-size:12px;color:var(--muted)}
+.keybox{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.sw img{width:18px;height:18px;border-radius:6px;border:1px solid rgba(255,255,255,.2)}
+.store .price{font:700 17px var(--display);color:var(--accent);white-space:nowrap;font-variant-numeric:tabular-nums}
+.store.best{border-color:var(--accent)}
+.tag{display:inline-block;font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--accent-ink);background:var(--accent);padding:2px 6px;border-radius:6px;margin-right:6px;vertical-align:1px}
+.loading{color:var(--muted);font-size:14px;padding:10px 0}
+.spec-list{margin:0;padding-left:18px}
+a.chip{color:var(--ink);text-decoration:none}
+.seg{display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:14px;margin-bottom:14px}
+.seg button{flex:1;border:0;background:none;padding:10px;border-radius:10px;color:var(--muted);font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--panel2);color:var(--ink)}
+.form{display:flex;flex-direction:column;gap:12px}
+.field-err{color:var(--warn);font-size:12px;margin-top:4px}
+.ok-txt{color:var(--ok);font-size:12px;margin-top:4px}
+.co-box{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:4px}
+.co-box b{font-weight:600}
+.badge{display:inline-block;font:500 11px var(--mono);padding:3px 8px;border-radius:999px;background:var(--panel2)}
+.badge.ok{color:var(--ok)} .badge.bad{color:var(--warn)}
+.offer{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:12px;background:var(--bg);border:1px solid var(--line)}
+.offer .price{font:700 16px var(--display);color:var(--accent);white-space:nowrap}
+.stars{color:var(--accent);font-size:13px;white-space:nowrap} .stars b{color:var(--ink);font-weight:600} .muted{color:var(--muted)}
+.pbadge{display:inline-block;font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.05em;padding:2px 6px;border-radius:6px;vertical-align:1px}
+.pbadge.dst{background:var(--panel2);color:var(--accent);border:1px solid var(--accent)} .pbadge.emp{background:var(--accent);color:var(--accent-ink)}
+.rate{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.rate-stars{display:flex;gap:6px;align-items:center}
+.rate-stars .rs{border:0;background:none;font-size:30px;line-height:1;color:var(--line);padding:0 2px}
+.rate-stars .rs.on{color:var(--accent)}
+.rate-stars .rs0{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:4px 10px;font:600 13px var(--mono);margin-left:6px}
+.rate-stars .rs0.on{background:var(--warn);color:#1b0a00;border-color:var(--warn)}
+.offer.win{border-color:var(--ok)}
+.req.locked{opacity:.85;border-style:dashed}
+.plans{display:grid;gap:10px}
+.plan{border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+.plan.cur{border-color:var(--accent)}
+.plan-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.plan-h b{font:700 18px var(--display)} .plan-h span{font:600 13px var(--mono);color:var(--accent)}
+.plan ul{margin:0;padding-left:18px;font-size:13px;color:var(--muted)}
+.seg button{font-size:13px}
+.ocr{font:500 12px/1.5 var(--mono);color:var(--muted);white-space:pre-wrap;max-height:90px;overflow:auto}
+.upd{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--accent);color:var(--accent-ink);border-radius:14px;padding:10px 12px;margin:0 0 12px;font-weight:600;font-size:14px}
+.upd button{border:0;border-radius:10px;background:var(--accent-ink);color:var(--accent);padding:8px 12px;font-weight:700}
+.saved{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px}
+.saved a,.saved button{color:var(--accent);font-weight:600;background:none;border:0;padding:0;text-decoration:underline}
+.lib{display:flex;flex-direction:column;gap:10px}
+.lib-it{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px;text-align:left;width:100%}
+.lib-it img,.lib-it .ph{width:64px;height:64px;border-radius:10px;object-fit:cover;background:var(--panel2);display:grid;place-items:center;color:var(--muted)}
+.lib-it b{display:block;font:700 15px/1.25 var(--display)}
+.lib-it .price{font:700 15px var(--display);color:var(--accent);white-space:nowrap}
+dialog{border:1px solid var(--line);border-radius:22px;background:var(--panel);color:var(--ink);padding:0;width:calc(100% - 24px);max-width:520px}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+.dlg{padding:18px;display:flex;flex-direction:column;gap:12px}
+.store .buy{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.store .buy button{border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);font-weight:700;padding:7px 12px;font-size:13px}
+.lib-open{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;margin-top:-4px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">procur<b>a</b></div>
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-scan" aria-selected="true">Câmera</button>
+      <button role="tab" id="tab-lib" aria-selected="false">Procuras</button>
+      <button role="tab" id="tab-acc" aria-selected="false">Conta</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="upd" id="upd" hidden><span id="upd-txt">Nova versão do app disponível</span><button id="upd-btn" type="button">Atualizar</button></div>
+
+    <!-- CÂMERA -->
+    <section id="view-scan">
+      <div class="viewfinder" id="vf">
+        <video id="video" playsinline muted autoplay></video>
+        <img id="shot" alt="Foto tirada" hidden>
+        <canvas id="overlay" hidden></canvas>
+        <div class="corners"></div>
+        <div class="scanline" id="scanline" hidden></div>
+        <div class="vf-msg" id="vfmsg" style="z-index:2">Abrindo câmera…</div>
+      </div>
+      <div class="controls">
+        <button class="ghost" id="btn-gallery">Galeria</button>
+        <button class="shutter" id="btn-shutter" aria-label="Tirar foto e analisar"></button>
+        <button class="ghost" id="btn-flip">Virar</button>
+      </div>
+      <p class="hint" id="hint">Enquadre o objeto e aperte o botão</p>
+      <div class="model-status" id="mstatus"></div>
+      <input type="file" id="file" accept="image/*" hidden>
+      <input type="file" id="cam" accept="image/*" capture="environment" hidden>
+
+      <div class="sheet" id="results" hidden>
+        <div class="card">
+          <p class="eyebrow" id="id-eyebrow">Identificação</p>
+          <h2 class="object-name" id="r-name">—</h2>
+          <div class="object-alt" id="r-alt"></div>
+          <span class="conf" id="r-conf"></span>
+          <div class="chips" id="r-alts" style="margin-top:10px" hidden></div>
+          <dl class="attrs" id="r-spec" style="margin-top:16px"></dl>
+          <div class="small" id="ai-status" style="margin-top:8px"></div>
+        </div>
+
+        <div class="card saved" id="saved" hidden></div>
+
+        <div class="card">
+          <p class="eyebrow">Mais detalhes (opcional)</p>
+          <div hidden>
+          <input class="text" id="q" autocomplete="off" aria-label="Termo de busca">
+          <div class="row" style="margin-top:10px">
+            <div><label class="field" for="f-brand">Marca</label><input class="text" id="f-brand" list="brand-list" placeholder="ex: Nike" autocomplete="off"></div>
+            <div><label class="field" for="f-size" id="f-size-label">Tamanho</label><input class="text" id="f-size" placeholder="opcional" autocomplete="off"></div>
+          </div>
+          </div>
+          <div><label class="field" for="f-obs">Modelo, especificação ou observação</label>
+            <textarea class="text" id="f-obs" rows="2" placeholder="ex: engrenagem 40 dentes, módulo 2, furo 12 mm" style="resize:vertical"></textarea></div>
+          <datalist id="brand-list"></datalist>
+          <div style="margin-top:12px"><button class="secondary" id="btn-research" type="button">Buscar de novo</button></div>
+        </div>
+
+        <div class="card" id="cat-card">
+          <p class="eyebrow">Onde comprar · lojas perto de você</p>
+          <div class="row">
+            <div><label class="field" for="fl-qtd">Quantidade</label><input class="text" id="fl-qtd" inputmode="decimal" value="1"></div>
+            <div><label class="field" for="fl-preco">Pago até (R$)</label><input class="text" id="fl-preco" inputmode="decimal" placeholder="qualquer valor"></div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <div><label class="field" for="fl-dist">Distância</label><select class="text" id="fl-dist"><option value="5">até 5 km</option><option value="10">até 10 km</option><option value="30" selected>até 30 km</option><option value="100">até 100 km</option><option value="">qualquer</option></select></div>
+            <div><label class="field" for="fl-ord">Ordenar por</label><select class="text" id="fl-ord"><option value="preco">menor preço</option><option value="dist">mais perto</option></select></div>
+          </div>
+          <div class="stores" id="cat"></div>
+        </div>
+
+        <div class="card">
+          <p class="eyebrow">Onde comprar · internet</p>
+          <div class="stores" id="offers" style="margin-top:0"></div>
+          <div class="small" style="margin:14px 0 6px">Ver mais, já ordenado por preço:</div>
+          <div class="chips" id="offer-links"></div>
+        </div>
+
+        <div class="card" hidden>
+          <p class="eyebrow">Lojas perto de você</p>
+          <div class="stores" id="nearby" style="margin-top:0"></div>
+          <div class="small" style="margin:14px 0 6px">No mapa:</div>
+          <div class="chips" id="near-links"></div>
+        </div>
+
+        <button class="secondary" id="btn-again">Nova foto</button>
+      </div>
+    </section>
+
+    <dialog id="buy"></dialog>
+
+    <!-- BIBLIOTECA -->
+    <section id="view-lib" hidden>
+      <div class="sheet" style="margin-top:0">
+        <div class="card"><p class="eyebrow">Histórico de procuras</p><div class="small">Tudo que você fotografa fica salvo aqui e no site do Procura.</div></div>
+        <div class="lib" id="lib"></div>
+      </div>
+    </section>
+
+    <!-- CONTA -->
+    <section id="view-acc" hidden>
+      <div class="sheet" style="margin-top:0" id="acc"></div>
+    </section>
+  </main>
+</div>
+
+<!-- Modelos rodam no próprio aparelho: sem API, sem custo por foto -->
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script>
+"use strict";
+/* Para publicar para todo mundo: preencha com os dados do seu projeto Supabase (Settings → API).
+   A "anon public key" pode ficar no arquivo: quem protege os dados são as regras (RLS) do schema.sql. */
+const CONFIG = { SUPABASE_URL: "https://npvsptyswgzklmtjzedl.supabase.co", SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5wdnNwdHlzd2d6a2xtdGp6ZWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0Njk3MDcsImV4cCI6MjEwNjA0NTcwN30.ro9IvkqmW3BMItN4-BE-8lG5vL0lP3ryU7qZNN54mmA" };
+const $ = s => document.querySelector(s);
+const state = { stream:null, facing:"environment", mobilenet:null, coco:null, ocr:null, result:null, coords:null };
+
+/* ---------- Tradução COCO (80 classes) ---------- */
+const COCO_PT = {person:"pessoa",bicycle:"bicicleta",car:"carro",motorcycle:"moto",airplane:"avião",bus:"ônibus",train:"trem",truck:"caminhão",boat:"barco","traffic light":"semáforo","fire hydrant":"hidrante","stop sign":"placa de pare","parking meter":"parquímetro",bench:"banco",bird:"pássaro",cat:"gato",dog:"cachorro",horse:"cavalo",sheep:"ovelha",cow:"vaca",elephant:"elefante",bear:"urso",zebra:"zebra",giraffe:"girafa",backpack:"mochila",umbrella:"guarda-chuva",handbag:"bolsa",tie:"gravata",suitcase:"mala de viagem",frisbee:"frisbee",skis:"esqui",snowboard:"snowboard","sports ball":"bola","kite":"pipa","baseball bat":"taco de beisebol","baseball glove":"luva de beisebol",skateboard:"skate",surfboard:"prancha de surf","tennis racket":"raquete de tênis",bottle:"garrafa","wine glass":"taça",cup:"caneca",fork:"garfo",knife:"faca",spoon:"colher",bowl:"tigela",banana:"banana",apple:"maçã",sandwich:"sanduíche",orange:"laranja",broccoli:"brócolis",carrot:"cenoura","hot dog":"cachorro-quente",pizza:"pizza",donut:"rosquinha",cake:"bolo",chair:"cadeira",couch:"sofá","potted plant":"vaso de planta",bed:"cama","dining table":"mesa",toilet:"vaso sanitário",tv:"televisão",laptop:"notebook",mouse:"mouse",remote:"controle remoto",keyboard:"teclado","cell phone":"celular",microwave:"micro-ondas",oven:"forno",toaster:"torradeira",sink:"pia",refrigerator:"geladeira",book:"livro",clock:"relógio",vase:"vaso",scissors:"tesoura","teddy bear":"ursinho de pelúcia","hair drier":"secador de cabelo",toothbrush:"escova de dente"};
+
+/* ---------- Tradução ImageNet (termos comuns em compras) ---------- */
+const IMG_PT = [
+ ["running shoe","tênis de corrida"],["sneaker","tênis"],["sandal","sandália"],["clog","tamanco"],["loafer","mocassim"],["cowboy boot","bota"],["boot","bota"],
+ ["sock","meia"],["knee pad","joelheira"],["swimming trunks","sunga"],["bikini","biquíni"],["brassiere","sutiã"],["pajama","pijama"],["apron","avental"],["lab coat","jaleco"],["mitten","luva"],["glove","luva"],["stole","echarpe"],["bonnet","touca"],["jersey","camiseta"],["t-shirt","camiseta"],["sweatshirt","moletom"],["cardigan","cardigã"],["jean","calça jeans"],["miniskirt","saia"],["suit","terno"],["trench coat","sobretudo"],["fur coat","casaco"],["poncho","poncho"],["bow tie","gravata borboleta"],["sunglass","óculos de sol"],["sunglasses","óculos de sol"],["spectacles","óculos"],["wallet","carteira"],["purse","bolsa"],["backpack","mochila"],["mailbag","bolsa carteiro"],["cap","boné"],["sombrero","chapéu"],["cowboy hat","chapéu"],["digital watch","relógio digital"],["analog clock","relógio"],["wall clock","relógio de parede"],["stopwatch","cronômetro"],["necklace","colar"],
+ ["cellular telephone","celular"],["cell phone","celular"],["ipod","player de música"],["notebook","notebook"],["laptop","notebook"],["desktop computer","computador"],["monitor","monitor"],["screen","monitor"],["television","televisão"],["computer keyboard","teclado"],["mouse","mouse"],["joystick","controle"],["remote control","controle remoto"],["modem","modem"],["printer","impressora"],["loudspeaker","caixa de som"],["headphone","fone de ouvido"],["microphone","microfone"],["reflex camera","câmera"],["polaroid camera","câmera instantânea"],["projector","projetor"],["hard disc","HD externo"],["power drill","furadeira"],["iron","ferro de passar"],["hair dryer","secador"],["hand blower","secador"],["vacuum","aspirador de pó"],["electric fan","ventilador"],["space heater","aquecedor"],["toaster","torradeira"],["microwave","micro-ondas"],["refrigerator","geladeira"],["washer","máquina de lavar"],["dishwasher","lava-louças"],["espresso maker","cafeteira"],["coffeepot","cafeteira"],["coffee mug","caneca"],["teapot","bule"],["frying pan","frigideira"],["wok","wok"],["caldron","panela"],["Dutch oven","panela"],["crock pot","panela elétrica"],["water bottle","garrafa de água"],["water jug","garrafão"],["beer bottle","garrafa"],["wine bottle","garrafa de vinho"],["pop bottle","garrafa pet"],["measuring cup","copo medidor"],["plate","prato"],["mixing bowl","tigela"],["spatula","espátula"],["ladle","concha"],["can opener","abridor"],["corkscrew","saca-rolhas"],
+ ["studio couch","sofá"],["folding chair","cadeira dobrável"],["rocking chair","cadeira de balanço"],["barber chair","cadeira"],["desk","escrivaninha"],["dining table","mesa"],["table lamp","luminária"],["lampshade","luminária"],["wardrobe","guarda-roupa"],["chiffonier","cômoda"],["bookcase","estante"],["file","arquivo"],["quilt","edredom"],["pillow","travesseiro"],["four-poster","cama"],["crib","berço"],["bassinet","moisés"],["shower curtain","cortina de box"],["window shade","persiana"],["doormat","capacho"],["vase","vaso"],["pot","vaso de planta"],
+ ["mountain bike","bicicleta"],["bicycle-built-for-two","bicicleta"],["tricycle","triciclo"],["moped","moto"],["scooter","patinete"],["crash helmet","capacete"],["football helmet","capacete"],["skateboard","skate"],["soccer ball","bola de futebol"],["basketball","bola de basquete"],["volleyball","bola de vôlei"],["tennis ball","bola de tênis"],["racket","raquete"],["dumbbell","halter"],["barbell","barra de musculação"],
+ ["hammer","martelo"],["screwdriver","chave de fenda"],["wrench","chave inglesa"],["chain saw","motosserra"],["lawn mower","cortador de grama"],["shovel","pá"],["padlock","cadeado"],["flashlight","lanterna"],["torch","lanterna"],["plunger","desentupidor"],["broom","vassoura"],["bucket","balde"],["ballpoint","caneta"],["fountain pen","caneta tinteiro"],["pencil box","estojo"],["rubber eraser","borracha"],["binder","fichário"],["envelope","envelope"],["guitar","violão"],["acoustic guitar","violão"],["electric guitar","guitarra"],["violin","violino"],["drum","bateria"],["piano","piano"],["teddy","ursinho de pelúcia"],["toy","brinquedo"],["lotion","hidratante"],["perfume","perfume"],["sunscreen","protetor solar"],["lipstick","batom"],["hair spray","spray de cabelo"],["pill bottle","frasco"],["umbrella","guarda-chuva"],["tent","barraca"],["sleeping bag","saco de dormir"],["stove","fogão"],["car wheel","roda"],["tire","pneu"]
+];
+function ptImagenet(label){
+  const parts = label.split(",").map(s=>s.trim());
+  for (const p of parts){ const l=p.toLowerCase();
+    for (const [en,pt] of IMG_PT) if (l===en.toLowerCase()) return pt; }
+  for (const p of parts){ const l=p.toLowerCase();
+    for (const [en,pt] of IMG_PT) if (l.includes(en.toLowerCase())) return pt; }
+  return null;
+}
+const CATEGORY = [
+ [/tijol|bloco de concreto|cimento|areia|brita|pedra|telha|argamassa|reboco|piso|porcelanato|azulejo|revestimento|tinta|massa corrida|vergalh|ferro de construção|madeira|caibro|viga|ripa|laje|cal |cal$|portão|janela|porta|caixa d.água|tubo|conexão|registro|telhado|gesso|drywall/,"Material de construção"],
+ [/smartwatch|anel|brinco|cinto|chinelo|bermuda|vestido|jaqueta|camisa|sapato|tênis|meia|joelheira|sunga|biquíni|sutiã|pijama|avental|jaleco|luva|echarpe|touca|bota|sandália|mocassim|tamanco|camiseta|moletom|calça|saia|terno|casaco|sobretudo|boné|chapéu|gravata|óculos|bolsa|carteira|mochila|colar|relógio/,"Moda e acessórios"],
+ [/tablet|caixa de som|soundbar|videogame|drone|carregador|cabo USB|roteador|placa de vídeo|assistente|celular|notebook|computador|monitor|televisão|teclado|mouse|controle|modem|impressora|caixa de som|fone|microfone|câmera|projetor|HD/,"Eletrônicos"],
+ [/air fryer|liquidificador|chaleira|chapinha|barbeador|sanduicheira|batedeira|ar-condicionado|robô aspirador|geladeira|micro-ondas|torradeira|cafeteira|máquina de lavar|lava-louças|ferro|aspirador|ventilador|aquecedor|secador|fogão|forno/,"Eletrodomésticos"],
+ [/panela|frigideira|caneca|bule|prato|tigela|copo|garrafa|garfo|faca|colher|taça|espátula|concha|abridor/,"Cozinha"],
+ [/tapete de yoga|esteira/,"Esporte e lazer"],
+ [/colchão|tapete|espelho|planta|toalha|lençol|sofá|cadeira|mesa|escrivaninha|luminária|guarda-roupa|cômoda|estante|cama|berço|travesseiro|edredom|cortina|persiana|vaso|capacho/,"Casa e móveis"],
+ [/bicicleta|moto|patinete|skate|capacete|bola|raquete|halter|barra|prancha|barraca|saco de dormir/,"Esporte e lazer"],
+ [/martelo|chave|furadeira|motosserra|cortador|pá|cadeado|lanterna|balde|vassoura/,"Ferramentas"],
+ [/violão|guitarra|violino|bateria|piano/,"Instrumentos musicais"],
+ [/perfume|hidratante|protetor|batom|spray|escova/,"Beleza e cuidado"],
+ [/carro|pneu|roda|caminhão/,"Automotivo"],
+ [/livro|caneta|estojo|borracha|fichário|envelope/,"Papelaria e livros"],
+ [/brinquedo|ursinho|boneca|pelúcia|blocos|tabuleiro/,"Brinquedos"],
+ [/ração|caminha|caixa de transporte/,"Pet"],[/carrinho de bebê|mamadeira|fralda/,"Bebê"],
+ [/refrigerante|cerveja|vinho|salgadinho|chocolate|café/,"Alimentos e bebidas"]
+];
+const TYPICAL = [
+ [/^tênis|bota|sandália|mocassim|tamanco/,"~22–32 cm de comprimento (numeração 34–44)"],
+ [/celular/,"~15 × 7 cm, tela de 6 a 6,8 pol."],[/notebook/,"tela 14–15,6 pol., ~36 × 25 cm"],
+ [/televisão/,"32 a 65 pol."],[/monitor/,"21 a 27 pol."],[/teclado/,"~44 cm (completo) · ~35 cm (compacto)"],[/mouse/,"~12 × 6 cm"],
+ [/caneca/,"~10 cm de altura, 300–400 ml"],[/garrafa/,"500 ml a 1,5 L"],[/panela|frigideira/,"18 a 28 cm de diâmetro"],
+ [/cadeira/,"assento a ~45 cm, 80–100 cm de altura"],[/sofá/,"2 a 3 lugares, 1,6–2,2 m"],[/mochila/,"20 a 35 litros"],
+ [/bola de futebol/,"tamanho 5, ~22 cm"],[/bola/,"~20–24 cm"],[/relógio/,"caixa de 38 a 45 mm"],[/bicicleta/,"aro 26 a 29"],[/capacete/,"tamanhos 54 a 62 cm"],
+ [/camiseta|moletom|casaco|sobretudo|pijama/,"P, M, G, GG"],[/calça/,"36 a 48"],[/geladeira/,"250 a 450 litros"],[/micro-ondas/,"20 a 30 litros"],[/ventilador/,"30 a 50 cm"]
+];
+const SIZE_FIELD = [
+ [/^tênis|bota|sandália|mocassim|tamanco|meia/,"Numeração","ex: 41"],[/camiseta|moletom|casaco|sobretudo|pijama|sutiã|biquíni|sunga/,"Tamanho","P / M / G"],
+ [/calça/,"Número","ex: 40"],[/televisão|monitor/,"Polegadas","ex: 50\""],[/bicicleta/,"Aro","ex: 29"],[/capacete/,"Tamanho","ex: 58"],
+ [/geladeira|micro-ondas|mochila/,"Litros","ex: 300 L"]
+];
+function styleOf(en,name,colors){
+  const e=(en||"").toLowerCase(); let s=null;
+  if(/running|sport|soccer|basketball|volleyball|tennis|jersey|sweatshirt|knee pad|racket|dumbbell/.test(e)) s="esportivo";
+  else if(/cowboy|boot/.test(e)) s="casual robusto";
+  else if(/loafer|suit|bow tie|windsor|trench/.test(e)) s="social";
+  else if(/sandal|clog|swimming|bikini|sombrero/.test(e)) s="casual / verão";
+  else if(/digital/.test(e)) s="digital";
+  else if(/analog/.test(e)) s="analógico";
+  else if(/rocking|four-poster|chiffonier/.test(e)) s="clássico";
+  else if(/studio couch|folding|desk/.test(e)) s="moderno";
+  else if(/moda/i.test(catOf(name))) s="casual";
+  const tone = colors[0] ? (/preto|azul-marinho|vinho|marrom/.test(colors[0].name)?"tom escuro":/branco|bege|azul-claro|rosa|amarelo/.test(colors[0].name)?"tom claro":"tom médio") : null;
+  const multi = colors.length>=2 && colors[1].pct>=30 ? "bicolor" : null;
+  return [s,tone,multi].filter(Boolean).join(" · ") || "—";
+}
+const catOf = n => (CATEGORY.find(([re])=>re.test(n))||[0,"Outros"])[1];
+
+/* ---------- Marcas conhecidas (para casar com o texto lido) ---------- */
+const BRANDS = ["Nike","Adidas","Puma","Mizuno","Olympikus","Asics","Fila","Vans","Converse","New Balance","Reebok","Under Armour","Havaianas","Samsung","Apple","iPhone","Motorola","Xiaomi","Redmi","LG","Sony","Philips","JBL","Dell","Lenovo","HP","Acer","Asus","Positivo","Multilaser","Intelbras","Logitech","Razer","HyperX","Redragon","Microsoft","Xbox","PlayStation","Nintendo","Canon","Nikon","GoPro","Brastemp","Consul","Electrolux","Britânia","Mondial","Arno","Oster","Walita","Tramontina","Nespresso","Dolce Gusto","Black+Decker","Bosch","Makita","DeWalt","Vonder","Stanley","Casio","Seiko","Orient","Technos","Ray-Ban","Oakley","Chilli Beans","Natura","Boticário","Avon","Colgate","Gillette","Tupperware","Stanley","Caloi","Shimano","Coca-Cola","Nestlé","Heineken","Lego","Mattel","Hot Wheels","Barbie","Hering","Lacoste","Tommy","Calvin Klein","Levi's","Oxer","Penalty","Topper","Wilson","Spalding"];
+const BRAND_HINT = { jbl:/caixa de som|fone de ouvido/, havaianas:/chinelo|sandália/, "ray-ban":/óculos de sol|óculos/, oakley:/óculos de sol|óculos/, caloi:/bicicleta/, nespresso:/cafeteira/, "dolce gusto":/cafeteira/, tupperware:/pote/, gopro:/câmera/ };
+window.BRANDS = BRANDS;
+function findBrand(text){
+  if(!text) return null;
+  const t = text.toLowerCase().replace(/[^a-z0-9à-ú+'\- ]/gi," ");
+  for (const b of BRANDS){
+    const re = new RegExp("(^|\\s)"+b.toLowerCase().replace(/[+]/g,"\\+")+"(\\s|$)");
+    if (re.test(t)) return b;
+  }
+  return null;
+}
+
+/* ---------- Cores ---------- */
+const COLORS = [["preto",[25,25,25]],["branco",[240,240,240]],["cinza",[128,128,128]],["prata",[192,192,192]],["vermelho",[200,30,35]],["vinho",[110,20,40]],["rosa",[240,130,170]],["laranja",[240,130,30]],["amarelo",[240,210,40]],["bege",[220,200,160]],["marrom",[120,75,40]],["verde",[40,150,60]],["verde-oliva",[110,120,50]],["azul",[40,90,200]],["azul-marinho",[20,35,80]],["azul-claro",[120,180,230]],["roxo",[110,50,160]],["dourado",[200,160,60]]];
+function colorName([r,g,b]){ let best=null,bd=1e9;
+  for(const [n,[R,G,B]] of COLORS){ const d=(r-R)**2*2+(g-G)**2*4+(b-B)**2*3; if(d<bd){bd=d;best=n;} } return best; }
+function dominantColors(ctx,x,y,w,h){
+  const step = Math.max(1,Math.floor(Math.sqrt(w*h/4000)));
+  const data = ctx.getImageData(x,y,w,h).data, px=[];
+  // pega o miolo (60%) para evitar fundo
+  const x0=w*.2,x1=w*.8,y0=h*.2,y1=h*.8;
+  for(let j=0;j<h;j+=step)for(let i=0;i<w;i+=step){ if(i<x0||i>x1||j<y0||j>y1) continue;
+    const k=(j*w+i)*4; px.push([data[k],data[k+1],data[k+2]]); }
+  if(!px.length) return [];
+  let c=[px[0],px[Math.floor(px.length/2)],px[px.length-1]].map(p=>p.slice());
+  for(let it=0;it<8;it++){ const s=c.map(()=>[0,0,0,0]);
+    for(const p of px){ let bi=0,bd=1e9; c.forEach((q,i)=>{const d=(p[0]-q[0])**2+(p[1]-q[1])**2+(p[2]-q[2])**2; if(d<bd){bd=d;bi=i;}}); const a=s[bi];a[0]+=p[0];a[1]+=p[1];a[2]+=p[2];a[3]++; }
+    c=s.map((a,i)=>a[3]?[a[0]/a[3],a[1]/a[3],a[2]/a[3],a[3]]:[...c[i].slice(0,3),0]); }
+  const total=px.length;
+  const out=[]; c.sort((a,b)=>b[3]-a[3]).forEach(q=>{ if(q[3]/total<.12) return;
+    const name=colorName(q); if(!out.find(o=>o.name===name)) out.push({name,rgb:q.slice(0,3).map(Math.round),pct:Math.round(q[3]/total*100)}); });
+  return out;
+}
+
+/* ---------- Recorte do objeto pelo contraste com o fundo ---------- */
+function foregroundBox(src){
+  const N=96, k=N/Math.max(src.width,src.height), w=Math.round(src.width*k), h=Math.round(src.height*k);
+  const c=document.createElement("canvas"); c.width=w; c.height=h; const x=c.getContext("2d",{willReadFrequently:true});
+  x.drawImage(src,0,0,w,h); const d=x.getImageData(0,0,w,h).data;
+  const border=[]; for(let i=0;i<w;i++){border.push(i, (h-1)*w+i);} for(let j=0;j<h;j++){border.push(j*w, j*w+w-1);}
+  // 4 cores de fundo (média por lado)
+  const sides=[[],[],[],[]]; for(let i=0;i<w;i++){sides[0].push(i);sides[1].push((h-1)*w+i);} for(let j=0;j<h;j++){sides[2].push(j*w);sides[3].push(j*w+w-1);}
+  const bg=sides.map(sd=>{let r=0,g=0,b=0; sd.forEach(p=>{r+=d[p*4];g+=d[p*4+1];b+=d[p*4+2];}); return [r/sd.length,g/sd.length,b/sd.length];});
+  let spread=0; border.forEach(p=>{ spread+=Math.min(...bg.map(q=>Math.hypot(d[p*4]-q[0],d[p*4+1]-q[1],d[p*4+2]-q[2]))); }); spread/=border.length;
+  const th=Math.max(38, spread*2.2), xs=[], ys=[];
+  for(let j=0;j<h;j++)for(let i=0;i<w;i++){ const p=(j*w+i)*4; const dist=Math.min(...bg.map(q=>Math.hypot(d[p]-q[0],d[p+1]-q[1],d[p+2]-q[2]))); if(dist>th){xs.push(i);ys.push(j);} }
+  if(xs.length < w*h*.04) return null;
+  xs.sort((a,b)=>a-b); ys.sort((a,b)=>a-b);
+  const q=(a,t)=>a[Math.floor((a.length-1)*t)];
+  let x0=q(xs,.03),x1=q(xs,.97),y0=q(ys,.03),y1=q(ys,.97);
+  const area=(x1-x0)*(y1-y0)/(w*h); if(area>.96||area<.03) return null;
+  return [x0/k,y0/k,(x1-x0)/k,(y1-y0)/k].map(Math.round);
+}
+
+function swatchURL(rgb){ const c=document.createElement("canvas"); c.width=c.height=8; const x=c.getContext("2d"); x.fillStyle=`rgb(${rgb.join(",")})`; x.fillRect(0,0,8,8); return c.toDataURL(); }
+function colorsHTML(list){ return list.map(c=>`<span class="sw"><img alt="" src="${swatchURL(c.rgb)}">${esc(c.name)}${c.pct?` <span style="color:var(--muted)">${c.pct}%</span>`:""}</span>`).join(""); }
+
+/* ---------- Câmera ---------- */
+function camMsg(html, withButton){
+  const m=$("#vfmsg"); m.hidden=false;
+  m.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px;align-items:center;max-width:280px">
+    <div style="font:700 20px/1.2 var(--display);color:var(--ink)">📷</div>
+    <div>${html}</div>
+    ${withButton?`<button class="primary" id="btn-allow" style="width:auto;padding:12px 20px">Permitir acesso à câmera</button>`:""}
+    <button class="${withButton?"ghost":"primary"}" id="btn-native" type="button" style="${withButton?"":"width:auto;padding:12px 20px"}">Abrir câmera do celular</button>
+    <button class="ghost" id="btn-alt-gallery" type="button">Escolher da galeria</button></div>`;
+  const a=$("#btn-allow"); if(a) a.onclick=()=>startCamera(true);
+  $("#btn-native").onclick=()=>$("#cam").click();
+  $("#btn-alt-gallery").onclick=()=>$("#file").click();
+}
+// Onde a câmera ao vivo é impossível (arquivo local, visualizador de outro app, iframe sem permissão)
+function liveCameraBlockedReason(){
+  if(location.protocol==="file:" || location.protocol==="content:" || !window.isSecureContext) return "Você abriu o arquivo direto do celular. Assim o navegador não deixa a câmera ao vivo funcionar.";
+  let inFrame=false; try{ inFrame = window.self!==window.top; }catch{ inFrame=true; }
+  const pp = document.permissionsPolicy || document.featurePolicy;
+  if(pp && pp.allowsFeature && !pp.allowsFeature("camera")) return "Este visualizador bloqueia a câmera ao vivo.";
+  if(inFrame) return "O app está aberto dentro de outro app/visualizador, que pode bloquear a câmera ao vivo.";
+  if(!navigator.mediaDevices?.getUserMedia) return "Este navegador não tem câmera ao vivo.";
+  return null;
+}
+async function startCamera(fromClick){
+  stopCamera();
+  $("#video").hidden=false; $("#shot").hidden=true; $("#overlay").hidden=true;
+  const blocked = liveCameraBlockedReason();
+  const hard = blocked && !/pode bloquear/.test(blocked);
+  if(hard){
+    return camMsg(blocked+"<br><br>Toque em <b>Abrir câmera do celular</b>: tira a foto normal e o app analisa do mesmo jeito. Para câmera ao vivo, abra o app por um link <b>https://</b> no Chrome/Safari.", false);
+  }
+  // Sem clique do usuário: só liga direto se a permissão já foi dada antes
+  if(!fromClick){
+    let perm="prompt";
+    try{ perm=(await navigator.permissions.query({name:"camera"})).state; }catch{}
+    if(perm!=="granted"){
+      return camMsg(perm==="denied"
+        ? "O acesso à câmera foi bloqueado. Toque no cadeado ao lado do endereço do site → Permissões → Câmera → Permitir, e depois toque abaixo."
+        : "O Procura precisa da câmera para fotografar o objeto que você quer comprar. A foto é analisada no seu celular e não é enviada para nenhum lugar.", true);
+    }
+  }
+  $("#vfmsg").hidden=false; $("#vfmsg").textContent="Abrindo câmera…";
+  try{
+    state.stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:state.facing,width:{ideal:1280},height:{ideal:1280}},audio:false});
+    $("#video").srcObject = state.stream; $("#vfmsg").hidden=true;
+  }catch(e){
+    const n=e && e.name;
+    if(n==="NotAllowedError"||n==="SecurityError"){
+      const why = liveCameraBlockedReason();
+      camMsg(why
+        ? why+"<br><br>Use <b>Abrir câmera do celular</b> (funciona igual), ou abra o link direto no Chrome/Safari."
+        : "O navegador bloqueou a câmera. No Android: cadeado ao lado do endereço → Permissões → Câmera → Permitir, e confira em Configurações → Apps → Chrome → Permissões → Câmera. No iPhone: Ajustes → Safari → Câmera → Permitir. Ou use <b>Abrir câmera do celular</b>.", true);
+    }
+    else if(n==="NotFoundError"||n==="OverconstrainedError")
+      camMsg("Não achei câmera neste aparelho.", false);
+    else if(n==="NotReadableError")
+      camMsg("A câmera está sendo usada por outro app. Feche o outro app e tente de novo.", true);
+    else camMsg("Não consegui abrir a câmera.", true);
+  }
+}
+function stopCamera(){ if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); state.stream=null; } }
+
+/* ---------- Modelos (todos locais, grátis) ---------- */
+function loadModels(){ return state.modelsP || (state.modelsP = loadModelsNow()); }
+async function loadModelsNow(){
+  const st=$("#mstatus");
+  try{
+    if(!hasKey()) st.textContent="carregando IA local (1ª vez ~10 MB)…";
+    // bibliotecas carregam em segundo plano (defer): o app abre na hora, mesmo com internet lenta
+    if(document.readyState==="loading") await new Promise(r=>document.addEventListener("DOMContentLoaded",r,{once:true}));
+    if(typeof tf==="undefined"||typeof mobilenet==="undefined"||typeof cocoSsd==="undefined") throw new Error("bibliotecas não carregaram");
+    await tf.ready();
+    const [m,c] = await Promise.all([ mobilenet.load({version:2,alpha:1.0}), cocoSsd.load({base:"lite_mobilenet_v2"}) ]);
+    state.mobilenet=m; state.coco=c;
+    if(!hasKey() && !window.CLIPX?.ready) st.textContent="IA básica pronta · baixando a avançada…";
+  }catch(e){ console.error(e); if(!hasKey()) st.textContent="IA do aparelho não carregou. Entre na sua conta para usar a IA do Procura."; }
+}
+async function getOCR(){
+  if(state.ocr) return state.ocr;
+  if(typeof Tesseract==="undefined") throw new Error("OCR indisponível");
+  state.ocr = await Tesseract.createWorker(["por","eng"]);
+  return state.ocr;
+}
+
+/* ---------- Captura ---------- */
+function captureFromVideo(){
+  const v=$("#video"); const c=document.createElement("canvas");
+  c.width=v.videoWidth; c.height=v.videoHeight; c.getContext("2d").drawImage(v,0,0); return c;
+}
+function canvasFromFile(file){
+  return new Promise((res,rej)=>{ const img=new Image(); img.onload=()=>{ const max=1280, s=Math.min(1,max/Math.max(img.width,img.height));
+    const c=document.createElement("canvas"); c.width=img.width*s; c.height=img.height*s; c.getContext("2d").drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(img.src); res(c); };
+    img.onerror=rej; img.src=URL.createObjectURL(file); });
+}
+
+async function analyze(canvas){
+  stopCamera();
+  $("#video").hidden=true; $("#vfmsg").hidden=true;
+  const shot=$("#shot"); shot.src=canvas.toDataURL("image/jpeg",.85); shot.hidden=false;
+  $("#scanline").hidden=false; $("#btn-shutter").disabled=true; $("#hint").textContent="Analisando…";
+  const ctx=canvas.getContext("2d");
+
+  // A foto nunca espera a IA do aparelho quando há chave na nuvem; sem chave, espera ela carregar
+  if(!(state.coco && state.mobilenet) && !hasKey()){ $("#hint").textContent="Carregando a IA (só na 1ª vez)…"; await loadModels(); $("#hint").textContent="Analisando…"; }
+  // 1) detecção com caixa (onde está o objeto)
+  const dets = state.coco ? await state.coco.detect(canvas,5).catch(()=>[]) : [];
+  let box = null, cocoLabel=null, cocoScore=0;
+  const main = dets.filter(d=>d.class!=="person").sort((a,b)=>b.score*b.bbox[2]*b.bbox[3]-a.score*a.bbox[2]*a.bbox[3])[0] || dets[0];
+  if(main && main.score>.35){ box=main.bbox.map(Math.round); cocoLabel=main.class; cocoScore=main.score; }
+
+  let boxGuess=false;
+  if(!box){ box=foregroundBox(canvas); boxGuess=!!box; }
+
+  // 2) classificação fina no recorte (ou na foto toda)
+  let crop=canvas;
+  if(box){ const [x,y,w,h]=box, pad=.08; const X=Math.max(0,x-w*pad),Y=Math.max(0,y-h*pad),W=Math.min(canvas.width-X,w*(1+2*pad)),H=Math.min(canvas.height-Y,h*(1+2*pad));
+    crop=document.createElement("canvas"); crop.width=W; crop.height=H; crop.getContext("2d").drawImage(canvas,X,Y,W,H,0,0,W,H); }
+  const preds = state.mobilenet ? await state.mobilenet.classify(crop,5).catch(()=>[]) : [];
+
+  // 3) cor dominante
+  const [bx,by,bw,bh] = box || [0,0,canvas.width,canvas.height];
+  const colors = dominantColors(ctx,bx,by,bw,bh);
+
+  // 4) nome final
+  const cands=[];
+  preds.forEach(p=>{ const pt=ptImagenet(p.className); cands.push({pt:pt||p.className.split(",")[0], en:p.className.split(",")[0], score:p.probability, known:!!pt}); });
+  // O detector de caixas (COCO) só conhece 80 coisas e "chuta" a mais parecida (caixa de som JBL vira prancha de surf).
+  // Ele serve para achar ONDE está o objeto; o nome vem do classificador (1000 tipos), a não ser que ele esteja perdido.
+  const ODD = /surfboard|skis|snowboard|kite|frisbee|baseball|tennis racket|sports ball|fire hydrant|parking meter|stop sign|traffic light|toilet|hot dog|donut|zebra|giraffe|elephant|bear|sheep|cow|horse|airplane|train|boat/;
+  const mnTop = cands[0]?.score || 0;
+  if(cocoLabel && COCO_PT[cocoLabel] && !ODD.test(cocoLabel) && cocoScore>.6 && mnTop<.2)
+    cands.push({pt:COCO_PT[cocoLabel],en:cocoLabel,score:cocoScore*.8,known:true});
+  let byScore=[...cands].sort((a,b)=>b.score-a.score);
+  let best = byScore.find(c=>c.known && c.score>=byScore[0].score*.5) || byScore[0] || {pt:"produto",en:"product",score:0,known:false};
+  let clipBrand=null;
+  if(window.CLIPX?.ready && !hasKey()){
+    try{
+      const cr = await window.CLIPX.classify(crop);
+      const alts = cr.types.map(t=>({pt:t.pt,en:t.en,score:t.p,known:true}));
+      cands.splice(0,cands.length,...alts,...cands.filter(c=>c.known&&!alts.some(a=>a.pt===c.pt)));
+      best = alts[0]; clipBrand = cr.brand;
+    }catch(e){ console.warn("CLIP falhou",e); }
+  }
+
+  const ratio = box ? bw/bh : canvas.width/canvas.height;
+  const shape = (ratio>1.25?"comprido (horizontal)":ratio<.8?"alto (vertical)":"compacto") + ` · proporção ${ratio.toFixed(2)}:1` + (box?"":" (foto inteira)");
+  const occ = box ? bw*bh/(canvas.width*canvas.height) : 1;
+  const size = box ? `ocupa ${Math.round(occ*100)}% da foto` + (boxGuess?" (contorno estimado)":"") : "objeto preenche a foto";
+
+  drawOverlay(canvas,box,best.pt);
+  const style = styleOf(best.en,best.pt,colors);
+  const dims = (TYPICAL.find(([re])=>re.test(best.pt))||[0,null])[1];
+  state.result = { name:best.pt, en:best.en, score:best.score, cands, colors, box, shape, size, style, dims, brand:clipBrand?clipBrand.name:null, ai:null };
+  state.crop = crop;
+  $("#scanline").hidden=true; $("#hint").textContent="";
+  renderResult();
+  runPipeline();
+}
+async function localBrand(){
+  try{
+    const w = await getOCR(); const { data } = await w.recognize(state.crop);
+    return findBrand(data.text) || guessWordmark(data);
+  }catch{ return null; }
+}
+function guessWordmark(data){
+  // palavra grande e confiável costuma ser a marca/logotipo
+  const words=(data.words||[]).filter(w=>w.confidence>75 && /^[A-Za-zÀ-ú][A-Za-zÀ-ú0-9\-]{2,}$/.test(w.text));
+  if(!words.length) return null;
+  words.sort((a,b)=>(b.bbox.y1-b.bbox.y0)-(a.bbox.y1-a.bbox.y0));
+  return words[0].text;
+}
+
+function drawOverlay(canvas,box,label){
+  const o=$("#overlay"); o.width=canvas.width; o.height=canvas.height; const c=o.getContext("2d");
+  c.clearRect(0,0,o.width,o.height);
+  if(box){ const [x,y,w,h]=box; const lw=Math.max(3,canvas.width/200);
+    c.strokeStyle="#ffcf3f"; c.lineWidth=lw; c.strokeRect(x,y,w,h);
+    c.font=`600 ${Math.round(canvas.width/28)}px Figtree, sans-serif`;
+    const tw=c.measureText(label).width+lw*6, th=canvas.width/20;
+    c.fillStyle="#ffcf3f"; c.fillRect(x,Math.max(0,y-th),tw,th);
+    c.fillStyle="#1b1600"; c.fillText(label,x+lw*3,Math.max(th*.75,y-th*.25)); }
+  o.hidden=false;
+}
+
+/* ---------- UI de resultado ---------- */
+const LS = { get:k=>{try{return localStorage.getItem(k)}catch{return null}}, set:(k,v)=>{try{localStorage.setItem(k,v)}catch{}} };
+const enc = encodeURIComponent;
+const brl = n => Number(n).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+// IA na nuvem = Edge Function "ia" do Supabase (a chave fica no servidor). Precisa estar logado.
+const hasKey = () => !!state.cloud;
+
+function specRows(){
+  const r=state.result, a=r.ai||{};
+  const rows=[];
+  rows.push(["Marca", a.marca || r.brand || $("#f-brand")?.value || (r.busy?"identificando…":"não identificada")]);
+  rows.push(["Modelo", [a.modelo,a.linha_versao].filter(Boolean).join(" · ") || (r.busy?"identificando…":"—")]);
+  const web=(state.lastOffers||[]).map(o=>o.preco_brl).filter(x=>x>0);
+  const v = (a.preco_novo_min_brl||a.preco_novo_max_brl) ? `${a.preco_novo_min_brl?brl(a.preco_novo_min_brl):"?"} a ${a.preco_novo_max_brl?brl(a.preco_novo_max_brl):"?"}`
+          : web.length ? (Math.min(...web)===Math.max(...web) ? brl(web[0]) : `${brl(Math.min(...web))} a ${brl(Math.max(...web))}`) : (r.busy?"calculando…":"—");
+  rows.push(["Valor aproximado", v]);
+  return rows;
+}
+function renderSpec(){
+  const r=state.result, a=r.ai;
+  const title = a ? (a.titulo_manual || [a.marca,a.modelo,a.linha_versao].filter(Boolean).join(" ") || cap(a.objeto||"")) : "";
+  $("#r-name").textContent = title || cap(r.name);
+  $("#r-alt").textContent = title && a.objeto && title.toLowerCase()!==a.objeto.toLowerCase() ? cap(a.objeto) : "";
+  const pct=Math.round((a?a.confianca:r.score)*100)||0;
+  const conf=$("#r-conf"); conf.textContent = r.busy ? "identificando marca e modelo…" : `confiança ${pct}%${a?"":" · só tipo do objeto"}`; conf.className="conf "+(r.busy?"":pct>=55?"hi":"lo");
+  const alts=(a?.alternativas||[]).filter(x=>x&&x.nome);
+  const showAlts = !r.busy && a && (alts.length || (a.confianca||0) < .75);
+  $("#r-alts").hidden=!showAlts;
+  if(showAlts){ $("#r-alts").innerHTML=`<span class="small" style="align-self:center">Não é isso?</span>`+alts.map((x,i)=>`<button class="chip" type="button" data-alt="${i}">${esc(x.nome)}</button>`).join("")+`<button class="chip" type="button" data-alt="edit">Outro: digitar</button>`;
+    $("#r-alts").querySelectorAll("[data-alt]").forEach(b=>b.onclick=()=>{ if(b.dataset.alt==="edit"){ $("#q").focus(); $("#q").select(); return; }
+      const x=alts[+b.dataset.alt]; const prev={nome:title||cap(r.name),termo_busca:$("#q").value,confianca:a.confianca};
+      r.ai={...a, titulo_manual:x.nome, termo_busca:x.termo_busca||x.nome, confianca:x.confianca||a.confianca, alternativas:[prev,...alts.filter(y=>y!==x)], marca:null, modelo:null, linha_versao:null, especificacoes:[], observacoes:"Escolhido por você"};
+      renderSpec(); buildQuery(); state.run=Date.now(); searchAll(state.coords, state.run); }); }
+  $("#r-spec").innerHTML = specRows().map(([k,v])=>`<dt>${k}</dt><dd>${Array.isArray(v)?`<ul class="spec-list">${v.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:esc(v)}</dd>`).join("");
+}
+function specText(){
+  return specRows().map(([k,v])=>Array.isArray(v)?`${k}:\n${v.map(x=>"• "+x).join("\n")}`:`${k}: ${v}`).join("\n");
+}
+function renderResult(){
+  const r=state.result;
+  $("#results").hidden=false; $("#ai-status").textContent="";
+  $("#f-size").value=""; $("#f-brand").value=""; $("#f-obs").value=""; $("#cat").innerHTML=""; state.cat=null;
+  const sf=SIZE_FIELD.find(([re])=>re.test(r.name));
+  $("#f-size-label").textContent = sf? sf[1] : "Tamanho / modelo"; $("#f-size").placeholder = sf? sf[2] : "opcional";
+  r.busy = hasKey();
+  renderSpec(); buildQuery();
+  $("#offers").innerHTML=`<div class="loading">Procurando ofertas…</div>`; $("#nearby").innerHTML=`<div class="loading">Procurando lojas perto…</div>`;
+  $("#offer-links").innerHTML=""; $("#near-links").innerHTML="";
+    setTimeout(()=>$("#results").scrollIntoView({behavior:"smooth",block:"start"}),50);
+}
+function buildQuery(){
+  const r=state.result, a=r.ai;
+  let parts = a?.termo_busca ? [a.termo_busca] : [r.name];
+  const brand=$("#f-brand").value.trim() || (!a && r.brand); if(brand && !parts.join(" ").toLowerCase().includes(brand.toLowerCase())) parts.push(brand);
+  const sz=$("#f-size").value.trim(); if(sz) parts.push(sz);
+  if(!a && r.colors[0] && !/cinza|prata/.test(r.colors[0].name)) parts.push(r.colors[0].name);
+  $("#q").value=parts.join(" ");
+}
+
+/* ---------- Fluxo automático: identifica → texto → ofertas → lojas perto ---------- */
+async function runPipeline(){
+  const token = state.run = Date.now();
+  const coordsP = getCoords();
+  if(hasKey()){
+    try{
+      state.result.ai = await iaIdentify();
+    }catch(e){ $("#ai-status").textContent = e.message; if(state.result.brand) $("#f-brand").value=state.result.brand; }
+    if(token!==state.run) return;
+    state.result.busy=false;
+    if(state.result.ai?.marca) $("#f-brand").value = state.result.ai.marca;
+  } else {
+    const b = await localBrand(); if(token!==state.run) return;
+    if(!b && state.result.brand) $("#f-brand").value=state.result.brand;
+    if(b){ state.result.brand=b; $("#f-brand").value=b;
+      const hint=BRAND_HINT[b.toLowerCase()]; if(hint && !hint.test(state.result.name)) state.result.name = hint.source.split("|")[0]; }
+  }
+  renderSpec(); buildQuery();
+  await searchAll(await coordsP, token);
+}
+async function searchAll(coords, token){
+  const q=[$("#q").value.trim(), $("#f-obs").value.trim()].filter(Boolean).join(" "); if(!q) return;
+  renderOfferLinks(q); renderNearLinks(q);
+  searchCatalog(token);
+  $("#offers").innerHTML=`<div class="loading">Procurando as ofertas mais baratas…</div>`;
+  $("#nearby").innerHTML=`<div class="loading">Procurando lojas perto…</div>`;
+  let data=null;
+  if(hasKey()){ try{ data = await iaOffers(q, coords); }catch(e){ console.warn(e); } }
+  if(token && token!==state.run) return;
+  let offers = data?.ofertas || [];
+  if(!offers.length){ offers = await mlOffers(q); }
+  renderOffers(offers, q);
+  state.lastOffers = offers.filter(o=>o && Number(o.preco_brl)>0).map(o=>({loja:o.loja, titulo:o.titulo, preco_brl:Number(o.preco_brl), condicao:o.condicao, url:o.url, cidade:o.cidade}));
+  renderNearby(data?.lojas_fisicas || [], q, coords);
+  renderSpec();
+  saveProcura();
+}
+
+/* ---------- IA do Procura (servidor) ---------- */
+async function callIA(body){
+  const { data, error } = await sb().functions.invoke("ia", { body });
+  if(error){ let m=error.message; try{ const j=await error.context?.json(); if(j?.erro) m=j.erro; }catch{} throw new Error(m); }
+  if(data?.erro) throw new Error(data.erro);
+  return data;
+}
+function currentJPEG(){ const s=$("#shot"); const max=1280, k=Math.min(1,max/Math.max(s.naturalWidth,s.naturalHeight));
+  const c=document.createElement("canvas"); c.width=s.naturalWidth*k; c.height=s.naturalHeight*k; c.getContext("2d").drawImage(s,0,0,c.width,c.height); return c.toDataURL("image/jpeg",.85); }
+async function iaIdentify(){
+  const a = await callIA({ acao:"identificar", imagem:currentJPEG().split(",")[1] });
+  for(const k in a) if(a[k]==="null"||a[k]==="") a[k]=null;
+  return a;
+}
+async function iaOffers(q, coords){ return await callIA({ acao:"ofertas", q, lat:coords?+coords.lat:null, lng:coords?+coords.lng:null }); }
+
+/* ---------- Mercado Livre (sem chave) ---------- */
+async function mlOffers(q){
+  try{
+    const r=await fetch(`https://api.mercadolibre.com/sites/MLB/search?q=${enc(q)}&sort=price_asc&limit=12`);
+    if(!r.ok) return [];
+    const j=await r.json();
+    return (j.results||[]).map(x=>({loja:"Mercado Livre",titulo:x.title,preco_brl:x.price,condicao:x.condition==="used"?"usado":"novo",url:x.permalink,cidade:x.seller_address?.city?.name||x.address?.city_name||"online"}));
+  }catch{ return []; }
+}
+
+/* ---------- Render das ofertas e lojas ---------- */
+function safeURL(u){ try{ const x=new URL(u); return /^https?:$/.test(x.protocol)?x.href:null; }catch{ return null; } }
+function renderOffers(list, q){
+  const el=$("#offers");
+  const items=list.filter(o=>o && Number(o.preco_brl)>0).map(o=>({...o,preco_brl:Number(o.preco_brl)})).sort((a,b)=>a.preco_brl-b.preco_brl);
+  if(!items.length){
+    el.innerHTML=`<div class="loading">${!hasKey()?"Entre na sua conta para ver preços da internet aqui dentro.":"Não achei preços confiáveis agora."} Use os atalhos abaixo, eles já abrem do mais barato ao mais caro.</div>`;
+    return;
+  }
+  el.innerHTML=items.map((o,i)=>{
+    const url = safeURL(o.url) || `https://www.google.com/search?q=${enc((o.loja||"")+" "+(o.titulo||q))}`;
+    return `<a class="store${i===0?" best":""}" href="${esc(url)}" target="_blank" rel="noopener">
+      <span>${i===0?`<span class="tag">mais barato</span>`:""}<strong>${esc(o.loja||"Loja")}</strong>
+        <small>${esc(o.titulo||q)}</small>
+        <small>${esc(o.condicao||"novo")} · ${esc(o.cidade||"online")}</small></span>
+      <span class="price">${brl(o.preco_brl)}</span></a>`;
+  }).join("") + `<div class="small" style="margin-top:6px">Preços encontrados agora na web. Confirme na loja antes de comprar.</div>`;
+}
+function renderNearby(stores, q, coords){
+  const el=$("#nearby");
+  const list=stores.filter(s=>s&&s.nome).sort((a,b)=>(a.distancia_km??999)-(b.distancia_km??999));
+  if(!list.length){
+    el.innerHTML=`<div class="loading">${coords?"":"Sem sua localização, o mapa usa a região aproximada. "}Toque num atalho abaixo para ver no mapa.</div>`; return;
+  }
+  el.innerHTML=list.map(s=>`<a class="store" href="https://www.google.com/maps/search/${enc(s.nome+" "+(s.endereco||""))}" target="_blank" rel="noopener">
+    <span><strong>${esc(s.nome)}</strong><small>${esc(s.endereco||"")}</small>${s.observacao?`<small>${esc(s.observacao)}</small>`:""}</span>
+    <span class="arrow">${s.distancia_km!=null?`${String(s.distancia_km).replace(".",",")} km`:"mapa →"}</span></a>`).join("");
+}
+function renderOfferLinks(q){
+  const slug=q.trim().toLowerCase().replace(/\s+/g,"-");
+  const L=[["Mercado Livre",`https://lista.mercadolivre.com.br/${enc(slug)}_OrderId_PRICE_NoIndex_True`],
+    ["Google Shopping",`https://www.google.com/search?tbm=shop&tbs=p_ord:p&q=${enc(q)}`],
+    ["Shopee",`https://shopee.com.br/search?keyword=${enc(q)}&order=asc&sortBy=price`],
+    ["OLX",`https://www.olx.com.br/brasil?q=${enc(q)}&sp=1`],
+    ["Buscapé",`https://www.buscape.com.br/search?q=${enc(q)}`],
+    ["AliExpress",`https://pt.aliexpress.com/w/wholesale-${enc(slug)}.html?SortType=price_asc`]];
+  $("#offer-links").innerHTML=L.map(([t,u])=>`<a class="chip" href="${u}" target="_blank" rel="noopener">${t} ↗</a>`).join("");
+}
+function renderNearLinks(q){
+  const c=state.coords; const at = c ? `/@${c.lat},${c.lng},14z` : "";
+  const cat=catOf(state.result?.ai?.objeto||state.result?.name||"");
+  const shopType = {"Eletrônicos":"loja de eletrônicos","Eletrodomésticos":"loja de eletrodomésticos","Moda e acessórios":"loja de roupas e calçados","Casa e móveis":"loja de móveis","Cozinha":"utilidades domésticas","Esporte e lazer":"loja de artigos esportivos","Ferramentas":"loja de ferragens","Instrumentos musicais":"loja de instrumentos musicais","Beleza e cuidado":"perfumaria","Automotivo":"autopeças","Papelaria e livros":"papelaria","Brinquedos":"loja de brinquedos"}[cat] || "loja";
+  const L=[["Produto no mapa",`https://www.google.com/maps/search/${enc(q)}${at}`],[cap(shopType),`https://www.google.com/maps/search/${enc(shopType)}${at}`],
+    ["Com estoque perto",`https://www.google.com/search?tbm=shop&tbs=local_avail:1,p_ord:p&q=${enc(q)}`],["Marketplace",`https://www.facebook.com/marketplace/search/?query=${enc(q)}&sortBy=price_ascend`]];
+  $("#near-links").innerHTML=L.map(([t,u])=>`<a class="chip" href="${u}" target="_blank" rel="noopener">${t} ↗</a>`).join("");
+}
+async function openLens(){
+  try{
+    const blob=await (await fetch(currentJPEG())).blob(); const file=new File([blob],"produto.jpg",{type:"image/jpeg"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:"Produto"}); return; }
+  }catch(e){ if(e && e.name==="AbortError") return; }
+  $("#ai-status").innerHTML="Seu navegador não deixa compartilhar daqui. Abra o app <b>Google</b> → ícone da câmera (Lens) → escolha a foto na galeria.";
+}
+function getCoords(){
+  return new Promise(res=>{
+    if(state.coords||!navigator.geolocation) return res(state.coords);
+    const t=setTimeout(()=>res(null),7000); // se a pessoa não responder ao pedido de localização, segue sem ela
+    navigator.geolocation.getCurrentPosition(p=>{ clearTimeout(t); state.coords={lat:p.coords.latitude.toFixed(4),lng:p.coords.longitude.toFixed(4)}; res(state.coords); },()=>{ clearTimeout(t); res(null); },{timeout:8000,maximumAge:600000});
+  });
+}
+
+/* ---------- Cadastro: CPF (comprador) e CNPJ (empresa) ---------- */
+const onlyDigits = v => String(v||"").replace(/\D/g,"");
+function validCPF(v){ const c=onlyDigits(v); if(c.length!==11||/^(\d)\1{10}$/.test(c)) return false;
+  const dv=n=>{ let s=0; for(let i=0;i<n;i++) s+=+c[i]*(n+1-i); const r=(s*10)%11; return r===10?0:r; };
+  return dv(9)===+c[9] && dv(10)===+c[10]; }
+// Aceita o CNPJ numérico e o novo alfanumérico (Receita Federal, a partir de jul/2026)
+const cnpjClean = v => String(v||"").toUpperCase().replace(/[^0-9A-Z]/g,"");
+function validCNPJ(v){ const c=cnpjClean(v); if(!/^[0-9A-Z]{12}\d{2}$/.test(c) || /^(.)\1{13}$/.test(c)) return false;
+  const val=ch=>ch.charCodeAt(0)-48;
+  const dv=len=>{ const w=len===12?[5,4,3,2,9,8,7,6,5,4,3,2]:[6,5,4,3,2,9,8,7,6,5,4,3,2]; let s=0; for(let i=0;i<len;i++) s+=val(c[i])*w[i]; const r=s%11; return r<2?0:11-r; };
+  return dv(12)===+c[12] && dv(13)===+c[13]; }
+const maskCPF = v => onlyDigits(v).slice(0,11).replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d{1,2})$/,"$1-$2");
+const maskCNPJ = v => cnpjClean(v).slice(0,14).replace(/^(\w{2})(\w)/,"$1.$2").replace(/^(\w{2})\.(\w{3})(\w)/,"$1.$2.$3").replace(/\.(\w{3})(\w)/,".$1/$2").replace(/(\w{4})(\d{1,2})$/,"$1-$2");
+const maskTel = v => { const d=onlyDigits(v).slice(0,11); return d.length>10? d.replace(/(\d{2})(\d{5})(\d{0,4})/,"($1) $2-$3") : d.replace(/(\d{2})(\d{4})(\d{0,4})/,"($1) $2-$3").replace(/[-(\s)]+$/,""); };
+const maskCEP = v => onlyDigits(v).slice(0,8).replace(/(\d{5})(\d)/,"$1-$2");
+
+async function lookupCNPJ(cnpj){
+  const c=cnpjClean(cnpj);
+  try{ const r=await fetch(`https://brasilapi.com.br/api/cnpj/v1/${c}`); if(r.ok){ const j=await r.json();
+    return { razao:j.razao_social, fantasia:j.nome_fantasia, situacao:j.descricao_situacao_cadastral, atividade:j.cnae_fiscal_descricao,
+      endereco:[j.descricao_tipo_de_logradouro, j.logradouro, j.numero].filter(Boolean).join(" ")+(j.bairro?` · ${j.bairro}`:""), cidade:j.municipio, uf:j.uf, cep:j.cep, telefone:j.ddd_telefone_1 }; }
+    if(r.status===404) return {notFound:true};
+  }catch{}
+  try{ const r=await fetch(`https://publica.cnpj.ws/cnpj/${c}`); if(r.ok){ const j=await r.json(), e=j.estabelecimento||{};
+    return { razao:j.razao_social, fantasia:e.nome_fantasia, situacao:e.situacao_cadastral, atividade:e.atividade_principal?.descricao,
+      endereco:[e.tipo_logradouro,e.logradouro,e.numero].filter(Boolean).join(" ")+(e.bairro?` · ${e.bairro}`:""), cidade:e.cidade?.nome, uf:e.estado?.sigla, cep:e.cep, telefone:e.ddd1&&e.telefone1?e.ddd1+e.telefone1:null }; }
+    if(r.status===404) return {notFound:true};
+  }catch{}
+  return null;
+}
+async function lookupCEP(cep){
+  try{ const r=await fetch(`https://brasilapi.com.br/api/cep/v2/${onlyDigits(cep)}`); if(!r.ok) return null; const j=await r.json();
+    return { cidade:j.city, uf:j.state, coords:j.location?.coordinates?.latitude?{lat:j.location.coordinates.latitude,lng:j.location.coordinates.longitude}:null }; }catch{ return null; }
+}
+function cap(s){ return s? s[0].toUpperCase()+s.slice(1):s; }
+function esc(s){ return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+let tt; function toast(m){ let t=$(".toast"); if(!t){ t=document.createElement("div"); t.className="toast"; document.body.appendChild(t);} t.textContent=m; t.hidden=false; clearTimeout(tt); tt=setTimeout(()=>t.hidden=true,2200); }
+
+/* ---------- Site, APK e versão ---------- */
+const APP_VERSION = "1.0.0";   // trocado pelo scripts/bump-version.mjs
+const SITE_URL = new URL("../", location.href).href;
+const APK_URL = "https://github.com/facincanitech/procura/releases/download/latest/procura.apk";
+
+/* ---------- Banco (mesmo Supabase do site) ---------- */
+let SB=null;
+function sb(){ if(!SB && window.supabase?.createClient) SB=window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {auth:{persistSession:true,autoRefreshToken:true}}); return SB; }
+function errMsg(e){ const m=(e&&(e.message||e.error_description))||String(e);
+  if(/Invalid login credentials/i.test(m)) return "E-mail ou senha errados.";
+  if(/Failed to fetch|NetworkError/i.test(m)) return "Sem conexão. Tente de novo.";
+  if(/procuras_usuario_fkey/.test(m)) return "Complete seu cadastro no site para salvar.";
+  return m; }
+async function currentUser(){ const c=sb(); if(!c) return null; const { data:{ session } } = await c.auth.getSession(); return session?.user || null; }
+async function currentPerfil(){ const u=await currentUser(); if(!u) return null; const { data } = await sb().from("perfis").select("id,tipo,nome,cidade").eq("id",u.id).maybeSingle(); return data ? {...data, email:u.email} : {id:u.id, email:u.email, incompleto:true}; }
+
+/* ---------- Salva cada procura na biblioteca (foto no Storage, banco guarda só o link) ---------- */
+function novaFoto(){ state.fotoUrl=null; state.procuraId=null; state.lastOffers=[]; $("#saved").hidden=true; }
+async function uploadShot(uid){
+  const s=$("#shot"), k=Math.min(1,900/Math.max(s.naturalWidth,s.naturalHeight));
+  const c=document.createElement("canvas"); c.width=Math.round(s.naturalWidth*k); c.height=Math.round(s.naturalHeight*k); c.getContext("2d").drawImage(s,0,0,c.width,c.height);
+  const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",.82));
+  const path=`${uid}/${crypto.randomUUID()}.jpg`;
+  const { error } = await sb().storage.from("procuras").upload(path, blob, { contentType:"image/jpeg", cacheControl:"31536000" });
+  if(error) throw error;
+  return sb().storage.from("procuras").getPublicUrl(path).data.publicUrl;
+}
+function savedMsg(html){ const el=$("#saved"); el.hidden=false; el.innerHTML=html; }
+async function saveProcura(){
+  const r=state.result; if(!r || r.busy) return;
+  const a=r.ai||{};
+  const u=await currentUser().catch(()=>null);
+  if(!u){ state.pendingSave=true; savedMsg(`<span>Entre na sua conta para guardar esta procura no histórico.</span><button type="button" id="sv-login">Entrar</button>`); $("#sv-login").onclick=()=>showTab("acc"); return; }
+  const rec={ titulo:($("#r-name").textContent||cap(r.name)).slice(0,160), termo:$("#q").value.trim()||null, observacao:$("#f-obs").value.trim()||null,
+    marca:a.marca||$("#f-brand").value.trim()||r.brand||null, modelo:a.modelo||null, categoria:catOf(a.objeto||r.name),
+    dados:r.ai || { objeto:r.name, cores:r.colors.map(c=>c.name), estilo:r.style, tamanho_estimado:r.dims },
+    ofertas:(state.lastOffers||[]).slice(0,12), lat:state.coords?+state.coords.lat:null, lng:state.coords?+state.coords.lng:null };
+  try{
+    savedMsg(`<span>Salvando no histórico…</span>`);
+    if(!state.fotoUrl) state.fotoUrl = await uploadShot(u.id);
+    rec.foto_url=state.fotoUrl;
+    if(state.procuraId){ const { error }=await sb().from("procuras").update(rec).eq("id",state.procuraId); if(error) throw error; }
+    else { const { data, error }=await sb().from("procuras").insert(rec).select("id").single(); if(error) throw error; state.procuraId=data.id; }
+    state.pendingSave=false;
+    savedMsg(`<span>✓ Salvo no seu histórico de procuras</span><a href="${SITE_URL}#procuras">ver no site</a>`);
+  }catch(e){ console.error(e); savedMsg(`<span>Não consegui salvar: ${esc(errMsg(e))}</span><button type="button" id="sv-retry">Tentar de novo</button>`); $("#sv-retry").onclick=saveProcura; }
+}
+
+/* ---------- Aba Procuras ---------- */
+async function renderLib(){
+  const el=$("#lib");
+  const u=await currentUser().catch(()=>null);
+  if(!u){ el.innerHTML=`<div class="empty">Entre na sua conta para ver seu histórico.<div style="margin-top:12px"><button class="primary" type="button" id="lib-login" style="width:auto;padding:10px 18px">Entrar</button></div></div>`; $("#lib-login").onclick=()=>showTab("acc"); return; }
+  el.innerHTML=`<div class="loading">Carregando…</div>`;
+  const { data, error } = await sb().from("procuras").select("*").order("criado_em",{ascending:false}).limit(100);
+  if(!el.isConnected) return;
+  if(error){ el.innerHTML=`<div class="empty">${esc(errMsg(error))}</div>`; return; }
+  if(!data.length){ el.innerHTML=`<div class="empty">Nada ainda. Aponte a câmera para um produto e aperte o botão amarelo.</div>`; return; }
+  const menor=p=>{ const o=(p.ofertas||[]).map(x=>+x.preco_brl).filter(x=>x>0); return o.length?Math.min(...o):null; };
+  el.innerHTML=data.map((p,i)=>`<button class="lib-it" type="button" data-i="${i}">
+    ${p.foto_url?`<img src="${esc(p.foto_url)}" alt="" loading="lazy">`:`<span class="ph">▢</span>`}
+    <span><b>${esc(p.titulo)}</b><span class="small">${new Date(p.criado_em).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</span></span>
+    <span class="price">${menor(p)?brl(menor(p)):""}</span></button><div data-o="${i}" hidden></div>`).join("");
+  el.querySelectorAll("[data-i]").forEach(b=>b.onclick=()=>{ const i=+b.dataset.i, box=el.querySelector(`[data-o="${i}"]`); if(!box.hidden){ box.hidden=true; return; }
+    const p=data[i], of=(p.ofertas||[]).filter(o=>+o.preco_brl>0).sort((x,y)=>x.preco_brl-y.preco_brl);
+    box.hidden=false; box.className="lib-open";
+    box.innerHTML=(of.length?of.map(o=>{ const url=safeURL(o.url)||`https://www.google.com/search?q=${enc((o.loja||"")+" "+(o.titulo||p.termo||p.titulo))}`;
+        return `<a class="store" href="${esc(url)}" target="_blank" rel="noopener"><span><strong>${esc(o.loja||"Loja")}</strong><small>${esc(o.titulo||"")}</small></span><span class="price">${brl(o.preco_brl)}</span></a>`; }).join("")
+        :`<div class="small">Nenhum preço salvo.</div>`)
+      +`<div class="row"><a class="secondary" style="text-align:center;text-decoration:none;color:var(--ink)" href="${SITE_URL}#procuras">Abrir no site</a><button class="secondary" type="button" data-del="${p.id}" style="color:var(--warn)">Apagar</button></div>`;
+    box.querySelector("[data-del]").onclick=async()=>{ if(!confirm("Apagar esta procura?")) return;
+      const { error }=await sb().from("procuras").delete().eq("id",p.id); if(error) return toast(errMsg(error));
+      const m=String(p.foto_url||"").match(/\/storage\/v1\/object\/public\/procuras\/(.+)$/); if(m) sb().storage.from("procuras").remove([decodeURIComponent(m[1])]);
+      renderLib(); };
+  });
+}
+
+/* ---------- Aba Conta ---------- */
+async function renderAccount(){
+  const el=$("#acc");
+  if(!sb()){ el.innerHTML=`<div class="card"><div class="loading">Carregando…</div></div>`; setTimeout(renderAccount,500); return; }
+  const p=await currentPerfil().catch(()=>null);
+  const appCard=`<div class="card"><p class="eyebrow">Sobre</p><div class="small">Procura ${esc(APP_VERSION)}${isNative()?" · app Android":" · navegador"}</div>
+    ${isNative()?"":`<div style="margin-top:10px"><a class="secondary" style="display:block;text-align:center;text-decoration:none;color:var(--ink)" href="${APK_URL}">Baixar o app para Android</a></div>`}</div>`;
+  if(p){
+    el.innerHTML=`<div class="card"><p class="eyebrow">Sua conta</p>
+      <div style="font:700 22px var(--display)">${esc(p.nome||p.email)}</div>
+      <div class="small">${esc(p.email)}${p.tipo?` · ${p.tipo==="vendedor"?"Vendedor (CNPJ)":"Comprador (CPF)"}`:""}${p.cidade?` · ${esc(p.cidade)}`:""}</div>
+      ${p.incompleto?`<div class="field-err" style="margin-top:8px">Seu cadastro não está completo. Termine no site para salvar suas procuras.</div>`:""}
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+        <a class="primary" style="text-align:center;text-decoration:none" href="${SITE_URL}">Abrir o site (compras e histórico)</a>
+        <button class="secondary" type="button" id="btn-out">Sair</button>
+      </div></div>`+appCard;
+    $("#btn-out").onclick=async()=>{ await sb().auth.signOut(); await refreshCloud(); toast("Você saiu"); renderAccount(); };
+    return;
+  }
+  el.innerHTML=`<div class="card"><p class="eyebrow">Entrar</p>
+    <form class="form" id="form-login" novalidate>
+      <div><label class="field" for="l-email">E-mail</label><input class="text" id="l-email" type="email" autocomplete="email"></div>
+      <div><label class="field" for="l-senha">Senha</label><input class="text" id="l-senha" type="password" autocomplete="current-password"></div>
+      <button class="primary" type="submit">Entrar</button>
+    </form>
+    <p class="small" style="margin-top:14px">Ainda não tem conta? O cadastro (CPF para comprador, CNPJ para empresa) é feito no site.</p>
+    <a class="secondary" style="display:block;text-align:center;text-decoration:none;color:var(--ink)" href="${SITE_URL}">Criar conta no site</a></div>`+appCard;
+  $("#form-login").onsubmit=async e=>{ e.preventDefault();
+    const { error } = await sb().auth.signInWithPassword({ email:$("#l-email").value.trim(), password:$("#l-senha").value });
+    if(error) return toast(errMsg(error));
+    toast("Bem-vindo"); await refreshCloud();
+    if(state.pendingSave && state.result){ showTab("scan"); saveProcura(); } else renderAccount(); };
+}
+
+/* ---------- Atualização automática (mesmo esquema do Thoth) ----------
+   A interface vem do site publicado: toda mudança aqui chega sozinha na próxima abertura.
+   Só mudança nativa (permissão, plugin) gera APK novo; aí o app compara com version.json e oferece instalar. */
+const CapX = window.Capacitor;
+// A página vem do site publicado, sem @capacitor/core: usa a ponte que o Capacitor injeta no WebView
+function isNative(){ return !!(window.androidBridge || CapX?.isNativePlatform?.() || (CapX?.getPlatform && CapX.getPlatform()!=="web")); }
+function nativeCall(plugin, method, opts={}){
+  if(CapX?.Plugins?.[plugin]?.[method]) return CapX.Plugins[plugin][method](opts);
+  if(CapX?.nativePromise) return CapX.nativePromise(plugin, method, opts);
+  return Promise.reject(new Error("ponte nativa indisponível"));
+}
+function versionNewer(a,b){ const p=v=>String(v||"").replace(/^v/i,"").split(".").map(x=>parseInt(x,10)||0); const x=p(a), y=p(b);
+  for(let i=0;i<Math.max(x.length,y.length);i++){ if((x[i]||0)>(y[i]||0)) return true; if((x[i]||0)<(y[i]||0)) return false; } return false; }
+async function checkUpdate(){
+  if(!isNative()) return;
+  try{
+    const info = await nativeCall("AppUpdate","getInfo");
+    const r = await fetch(new URL("../version.json", location.href).href+"?t="+Date.now(), {cache:"no-store"}); if(!r.ok) return;
+    const v = await r.json();
+    if(v.androidVersion && versionNewer(v.androidVersion, info.version)){
+      $("#upd-txt").textContent=`Nova versão do app (${v.androidVersion})`; $("#upd").hidden=false;
+      $("#upd-btn").onclick=async()=>{ const b=$("#upd-btn"); b.disabled=true; b.textContent="Baixando…";
+        try{ await nativeCall("AppUpdate","downloadAndInstall",{url:APK_URL}); b.textContent="Instalar"; }
+        catch(e){ toast("Não consegui atualizar: "+errMsg(e)); }
+        finally{ b.disabled=false; if(b.textContent==="Baixando…") b.textContent="Atualizar"; } };
+    }
+  }catch(e){ console.warn("update", e); }
+}
+
+
+/* ---------- Itens das lojas do Procura: busca, filtros e compra ---------- */
+const PAGAMENTOS = { pix:"PIX", credito:"Cartão de crédito", debito:"Cartão de débito", dinheiro:"Dinheiro", boleto:"Boleto", faturado:"Faturado (a prazo)" };
+const pagTxt = arr => (arr||[]).map(k=>PAGAMENTOS[k]||k).join(" · ");
+function parseNum(v){ v=String(v??"").trim(); if(!v) return null; if(/,/.test(v)) v=v.replace(/\./g,"").replace(",","."); const n=parseFloat(v); return isFinite(n)?n:null; }
+const num = n => Number(n||0).toLocaleString("pt-BR",{maximumFractionDigits:2});
+// Tenta do termo mais específico (com a observação) ao mais geral (só o tipo do objeto), até alguma loja ter
+async function searchCatalog(token){
+  const el=$("#cat");
+  if(!await currentUser().catch(()=>null)){ el.innerHTML=`<div class="loading">Entre na sua conta para ver os itens das lojas do Procura e comprar.</div><button class="secondary" type="button" id="cat-login">Entrar</button>`; $("#cat-login").onclick=()=>showTab("acc"); return; }
+  const r=state.result||{}, a=r.ai||{}, q=$("#q").value.trim(), obs=$("#f-obs").value.trim(), tipo=a.objeto||r.name;
+  const cands=[...new Set([[q,obs].filter(Boolean).join(" "), q, [tipo,a.marca].filter(Boolean).join(" "), tipo].filter(x=>x && x.trim().length>=2))];
+  const qtd=parseNum($("#fl-qtd").value)||1, c=state.coords;
+  el.innerHTML=`<div class="loading">Procurando nas lojas do Procura…</div>`;
+  let rows=[], used=null;
+  for(const t of cands){
+    const { data, error } = await sb().rpc("buscar_produtos",{ p_q:t, p_qtd:qtd, p_lat:c?+c.lat:null, p_lng:c?+c.lng:null, p_raio_km:null, p_pronta:false });
+    if(token && token!==state.run) return;
+    if(error){ el.innerHTML=`<div class="loading">${esc(errMsg(error))}</div>`; return; }
+    if(data.length){ rows=data; used=t; break; }
+  }
+  state.cat={ rows, used, qtd }; renderCatalog();
+}
+function renderCatalog(){
+  const el=$("#cat"), st=state.cat; if(!st) return;
+  const max=parseNum($("#fl-preco").value), dist=$("#fl-dist").value, ord=$("#fl-ord").value;
+  let rows=st.rows.filter(x=>(max==null || +x.total<=max) && (!dist || (x.distancia_km!=null && +x.distancia_km<=+dist)));
+  rows.sort(ord==="dist" ? (x,y)=>(x.distancia_km??9e9)-(y.distancia_km??9e9) : (x,y)=>x.total-y.total);
+  if(!st.rows.length){ el.innerHTML=`<div class="loading">Nenhuma loja do Procura tem esse item agora. Veja os preços da internet abaixo.</div>`; return; }
+  if(!rows.length){ el.innerHTML=`<div class="loading">${st.rows.length} ${st.rows.length>1?"lojas têm":"loja tem"}, mas fora dos filtros. Aumente a distância ou o valor.</div>`; return; }
+  el.innerHTML = (st.used!==$("#q").value.trim()?`<div class="small">Resultados para “${esc(st.used)}”</div>`:"") + rows.map((x,i)=>`<div class="store${i===0?" best":""}">
+      <span>${i===0?`<span class="tag">${ord==="dist"?"mais perto":"melhor preço"}</span>`:""}<strong>${esc(x.nome)}</strong>
+        <small>${esc(x.loja)} · ${x.nota?`★ ${String(x.nota).replace(".",",")} (${x.avaliacoes})`:"sem avaliações"}</small>
+        <small>${x.distancia_km!=null?`${String(x.distancia_km).replace(".",",")} km · `:""}${esc(x.cidade||"")}${x.pronta_entrega?` · ${num(x.estoque)} ${esc(x.unidade)} em estoque`:" · sob encomenda"}</small>
+        <small>Pagamento: ${esc(pagTxt(x.pagamentos))}</small></span>
+      <span class="buy"><span class="price">${brl(x.total)}</span><small class="small">${brl(x.preco)}/${esc(x.unidade)}</small><button type="button" data-buy="${st.rows.indexOf(x)}">Comprar</button></span>
+    </div>`).join("");
+  el.querySelectorAll("[data-buy]").forEach(b=>b.onclick=()=>openBuy(st.rows[+b.dataset.buy]));
+}
+function openBuy(x){
+  const d=$("#buy"); let entrega="retirada";
+  const qtd0=state.cat.qtd;
+  d.innerHTML=`<form class="dlg" id="b-form">
+    <p class="eyebrow" style="margin:0">Comprar de ${esc(x.loja)}</p>
+    <div style="font:700 20px var(--display)">${esc(x.nome)}</div>
+    <div class="small">${brl(x.preco)} por ${esc(x.unidade)}${x.distancia_km!=null?` · ${String(x.distancia_km).replace(".",",")} km`:""}</div>
+    <div class="row"><div><label class="field" for="b-qtd">Quantidade</label><input class="text" id="b-qtd" inputmode="decimal" value="${esc(num(qtd0))}"></div>
+      <div><label class="field" for="b-pag">Pagamento</label><select class="text" id="b-pag">${(x.pagamentos||[]).map(k=>`<option value="${k}">${PAGAMENTOS[k]||k}</option>`).join("")}</select></div></div>
+    <div class="seg" role="group"><button type="button" data-e="retirada" aria-pressed="true">Eu retiro</button><button type="button" data-e="entrega" aria-pressed="false">Entregar</button></div>
+    <div id="b-endbox" hidden><label class="field" for="b-end">Endereço de entrega</label><textarea class="text" id="b-end" rows="2"></textarea><div class="small">Frete combinado com a loja depois do pagamento.</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="small">Total</span><span style="font:700 24px var(--display);color:var(--accent)" id="b-tot">${brl(x.preco*qtd0)}</span></div>
+    <button class="primary" type="submit">Fechar pedido</button>
+    <button class="secondary" type="button" id="b-cancel">Cancelar</button>
+  </form>`;
+  $("#b-qtd").oninput=()=>{ $("#b-tot").textContent=brl(x.preco*(parseNum($("#b-qtd").value)||0)); };
+  d.querySelectorAll("[data-e]").forEach(b=>b.onclick=()=>{ entrega=b.dataset.e; d.querySelectorAll("[data-e]").forEach(y=>y.setAttribute("aria-pressed",y===b)); $("#b-endbox").hidden=entrega!=="entrega"; });
+  $("#b-cancel").onclick=()=>d.close();
+  $("#b-form").onsubmit=async e=>{ e.preventDefault();
+    const qtd=parseNum($("#b-qtd").value); if(!qtd||qtd<=0) return toast("Quantidade inválida");
+    const pag=$("#b-pag").value||null, btn=e.submitter; btn.disabled=true;
+    const { data:id, error } = await sb().rpc("criar_pedido",{ p_itens:[{produto_id:x.produto_id,qtd}], p_entrega:entrega, p_endereco:entrega==="entrega"?$("#b-end").value:null, p_pagamento:pag });
+    btn.disabled=false; if(error) return toast(errMsg(error));
+    d.innerHTML=`<div class="dlg"><p class="eyebrow" style="margin:0">Pedido #${id} criado</p>
+      <div style="font:700 20px var(--display)">${esc(x.nome)}</div>
+      <div class="small">${esc(num(qtd))} ${esc(x.unidade)} · ${brl(x.preco*qtd)} · ${esc(PAGAMENTOS[pag]||"")}</div>
+      <button class="primary" type="button" id="b-pay">Pagar agora (simulação de teste)</button>
+      <a class="secondary" style="text-align:center;text-decoration:none;color:var(--ink)" href="${SITE_URL}#compras">Acompanhar no site</a>
+      <button class="secondary" type="button" id="b-close">Fechar</button></div>`;
+    $("#b-close").onclick=()=>d.close();
+    $("#b-pay").onclick=async()=>{ const { error }=await sb().rpc("simular_pagamento",{p_pedido:id}); if(error) return toast(errMsg(error)); toast("Pagamento confirmado. A loja já pode separar."); d.close(); };
+  };
+  d.showModal();
+}
+
+/* ---------- abas e eventos ---------- */
+function showTab(which){
+  ["scan","lib","acc"].forEach(t=>{ $("#tab-"+t).setAttribute("aria-selected",t===which); $("#view-"+t).hidden=t!==which; });
+  if(which==="scan"){ if($("#results").hidden) startCamera(); } else stopCamera();
+  if(which==="lib") renderLib();
+  if(which==="acc") renderAccount();
+  $("main").scrollTo({top:0}); }
+function err(e){ console.error(e); $("#scanline").hidden=true; $("#hint").textContent="Não consegui analisar. Tente outra foto."; $("#btn-shutter").disabled=false; }
+$("#tab-scan").onclick=()=>showTab("scan"); $("#tab-lib").onclick=()=>showTab("lib"); $("#tab-acc").onclick=()=>showTab("acc");
+$("#btn-shutter").onclick=()=>{ novaFoto(); if(!state.stream) return $("#cam").click(); analyze(captureFromVideo()).catch(err); };
+$("#btn-gallery").onclick=()=>$("#file").click();
+$("#cam").onchange=e=>$("#file").onchange(e);
+$("#file").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; novaFoto(); analyze(await canvasFromFile(f)).catch(err); e.target.value=""; };
+$("#btn-flip").onclick=()=>{ state.facing = state.facing==="environment"?"user":"environment"; startCamera(true); };
+$("#btn-again").onclick=()=>{ novaFoto(); $("#results").hidden=true; $("#btn-shutter").disabled=false; $("#hint").textContent="Enquadre o objeto e aperte o botão"; startCamera(true); $("main").scrollTo({top:0,behavior:"smooth"}); };
+$("#brand-list").innerHTML=[...new Set(BRANDS)].map(b=>`<option value="${esc(b)}">`).join("");
+["#f-brand","#f-size"].forEach(id=>$(id).addEventListener("change",()=>{ if(state.result) buildQuery(); }));
+$("#btn-research").onclick=()=>{ state.run=Date.now(); searchAll(state.coords, state.run); };
+$("#q").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("#btn-research").click(); } });
+$("#f-obs").addEventListener("keydown",e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); $("#btn-research").click(); } });
+$("#fl-qtd").addEventListener("change",()=>searchCatalog(state.run));
+["#fl-dist","#fl-ord"].forEach(id=>$(id).addEventListener("change",renderCatalog));
+$("#fl-preco").addEventListener("input",renderCatalog);
+if(false) $("#btn-copy").onclick=async()=>{ const o=$("#f-obs").value.trim(); const t=specText()+(o?`\nObservação: ${o}`:""); try{ await navigator.clipboard.writeText(t); toast("Texto copiado"); }catch{ toast("Não consegui copiar"); } };
+startCamera();
+// logado = usa a IA do Procura no servidor; sem conta = IA básica do aparelho
+async function refreshCloud(){ const u=await currentUser().catch(()=>null); state.cloud=!!u; LS.set("procura.cloud", u?"1":""); if(u) $("#mstatus").textContent="IA do Procura ativa · aperte o botão"; else loadModels(); }
+refreshCloud();
+window.addEventListener("load", checkUpdate);
+
+</script>
+<script type="module">
+/* CLIP (OpenAI, via Transformers.js da Hugging Face): compara a foto com centenas de descrições
+   ("a portable bluetooth speaker", "a JBL product with the JBL logo") e escolhe a mais parecida.
+   Grátis, roda no celular. Os textos são calculados 1 vez e ficam salvos; depois só o modelo de imagem roda. */
+import { AutoTokenizer, CLIPTextModelWithProjection, AutoProcessor, CLIPVisionModelWithProjection, RawImage, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
+env.allowLocalModels = false;
+try{ env.backends.onnx.wasm.proxy = true; }catch{}   // roda a IA em segundo plano, a tela não trava
+const ID = "Xenova/clip-vit-base-patch32";
+const TYPES = [
+ ["running shoe","tênis de corrida"],["casual sneaker","tênis casual"],["high heel shoe","sapato de salto"],["leather dress shoe","sapato social"],["flip-flops","chinelo"],["sandal","sandália"],["boot","bota"],
+ ["t-shirt","camiseta"],["polo shirt","camisa polo"],["button-up dress shirt","camisa social"],["hoodie","moletom"],["jacket","jaqueta"],["jeans","calça jeans"],["shorts","bermuda"],["dress","vestido"],["skirt","saia"],["socks","meia"],
+ ["baseball cap","boné"],["hat","chapéu"],["backpack","mochila"],["handbag","bolsa"],["wallet","carteira"],["wristwatch","relógio de pulso"],["smartwatch","smartwatch"],["sunglasses","óculos de sol"],["eyeglasses","óculos de grau"],["necklace","colar"],["ring","anel"],["earrings","brinco"],["belt","cinto"],["perfume bottle","perfume"],
+ ["smartphone","celular"],["tablet","tablet"],["laptop","notebook"],["desktop computer","computador"],["computer monitor","monitor"],["television","televisão"],["portable bluetooth speaker","caixa de som bluetooth"],["soundbar","soundbar"],["over-ear headphones","fone de ouvido"],["wireless earbuds","fone de ouvido sem fio"],["computer mouse","mouse"],["computer keyboard","teclado"],["game controller","controle de videogame"],["video game console","videogame"],["digital camera","câmera fotográfica"],["drone","drone"],["power bank","carregador portátil"],["phone charger","carregador de celular"],["usb cable","cabo USB"],["wifi router","roteador"],["printer","impressora"],["smart speaker","assistente inteligente"],["microphone","microfone"],["graphics card","placa de vídeo"],["external hard drive","HD externo"],["projector","projetor"],
+ ["refrigerator","geladeira"],["microwave oven","micro-ondas"],["washing machine","máquina de lavar"],["air fryer","air fryer"],["blender","liquidificador"],["coffee machine","cafeteira"],["electric kettle","chaleira elétrica"],["toaster","torradeira"],["kitchen stove","fogão"],["vacuum cleaner","aspirador de pó"],["robot vacuum","robô aspirador"],["electric fan","ventilador"],["air conditioner","ar-condicionado"],["clothes iron","ferro de passar"],["hair dryer","secador de cabelo"],["hair straightener","chapinha"],["electric shaver","barbeador elétrico"],["sandwich maker","sanduicheira"],["stand mixer","batedeira"],
+ ["frying pan","frigideira"],["cooking pot","panela"],["pressure cooker","panela de pressão"],["mug","caneca"],["drinking glass","copo"],["water bottle","garrafa de água"],["thermos","garrafa térmica"],["plate","prato"],["kitchen knife","faca de cozinha"],["cutlery set","talheres"],["food storage container","pote"],
+ ["sofa","sofá"],["chair","cadeira"],["office chair","cadeira de escritório"],["gaming chair","cadeira gamer"],["table","mesa"],["desk","escrivaninha"],["bed","cama"],["mattress","colchão"],["pillow","travesseiro"],["lamp","luminária"],["wardrobe","guarda-roupa"],["bookshelf","estante"],["rug","tapete"],["curtain","cortina"],["mirror","espelho"],["vase","vaso"],["potted plant","planta"],["wall clock","relógio de parede"],["towel","toalha"],["bed sheets","lençol"],
+ ["bicycle","bicicleta"],["electric scooter","patinete elétrico"],["skateboard","skate"],["bicycle helmet","capacete"],["soccer ball","bola de futebol"],["basketball","bola de basquete"],["dumbbell","halter"],["yoga mat","tapete de yoga"],["treadmill","esteira"],["camping tent","barraca"],["fishing rod","vara de pesca"],["surfboard","prancha de surf"],["soccer jersey","camisa de time"],
+ ["power drill","furadeira"],["screwdriver","chave de fenda"],["hammer","martelo"],["wrench","chave inglesa"],["toolbox","caixa de ferramentas"],["ladder","escada"],["flashlight","lanterna"],["padlock","cadeado"],["pressure washer","lavadora de alta pressão"],
+ ["acoustic guitar","violão"],["electric guitar","guitarra"],["electronic keyboard piano","teclado musical"],["drum kit","bateria"],["violin","violino"],["ukulele","ukulele"],
+ ["lipstick","batom"],["makeup palette","paleta de maquiagem"],["skincare cream jar","creme"],["shampoo bottle","shampoo"],["toothbrush","escova de dente"],["electric toothbrush","escova elétrica"],
+ ["car tire","pneu"],["car","carro"],["motorcycle","moto"],["car battery","bateria de carro"],["motorcycle helmet","capacete de moto"],
+ ["book","livro"],["paper notebook","caderno"],["pen","caneta"],["calculator","calculadora"],
+ ["toy car","carrinho de brinquedo"],["doll","boneca"],["stuffed animal toy","pelúcia"],["lego bricks","blocos de montar"],["board game","jogo de tabuleiro"],
+ ["bag of pet food","ração"],["dog bed","caminha de cachorro"],["pet carrier","caixa de transporte"],
+ ["baby stroller","carrinho de bebê"],["baby bottle","mamadeira"],["pack of diapers","fralda"],
+ ["soda can","lata de refrigerante"],["beer bottle","cerveja"],["wine bottle","vinho"],["bag of chips","salgadinho"],["chocolate bar","chocolate"],["bag of coffee","café"]
+];
+const BRANDS_EN = [...new Set(window.BRANDS || [])];
+const typeTexts = TYPES.map(([en])=>`a photo of a ${en}`);
+const brandTexts = [...BRANDS_EN.map(b=>`a photo of a ${b} product with the ${b} logo`), "a photo of a product with no visible brand or logo"];
+const CACHE_KEY = "procura.clip.v1." + TYPES.length + "." + brandTexts.length;
+
+const st = (t)=>{ const el=document.getElementById("mstatus"); if(el && !window.CLIPX.ready) el.textContent=t; };
+const files={}; const onProg=p=>{ if(p.status==="progress"&&p.total){ files[p.file]=[p.loaded,p.total]; const L=Object.values(files).reduce((a,[l])=>a+l,0), T=Object.values(files).reduce((a,[,t])=>a+t,0); st(`baixando IA avançada ${Math.round(L/1048576)}/${Math.round(T/1048576)} MB · só na 1ª vez`); } };
+
+function norm(v){ let n=0; for(const x of v) n+=x*x; n=Math.sqrt(n)||1; return v.map(x=>x/n); }
+function toB64(f32){ const u=new Uint8Array(f32.buffer); let s=""; for(let i=0;i<u.length;i+=0x8000) s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000)); return btoa(s); }
+function fromB64(b){ const s=atob(b), u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return new Float32Array(u.buffer); }
+
+async function textEmbeds(){
+  try{ const c=localStorage.getItem(CACHE_KEY); if(c){ const {dim,t,b}=JSON.parse(c); const split=(f)=>{const a=fromB64(f),o=[]; for(let i=0;i<a.length;i+=dim) o.push(Array.from(a.subarray(i,i+dim))); return o;}; return {types:split(t),brands:split(b)}; } }catch{}
+  const tok = await AutoTokenizer.from_pretrained(ID);
+  const tm = await CLIPTextModelWithProjection.from_pretrained(ID,{dtype:"q8",progress_callback:onProg});
+  const all=[...typeTexts,...brandTexts];
+  async function embed(texts){ const out=[]; for(let i=0;i<texts.length;i+=32){ const inp=tok(texts.slice(i,i+32),{padding:true,truncation:true}); const {text_embeds}=await tm(inp); const [n,d]=text_embeds.dims; for(let k=0;k<n;k++) out.push(norm(Array.from(text_embeds.data.slice(k*d,(k+1)*d)))); st(`preparando IA avançada… ${Math.min(100,Math.round((out.length)/all.length*100))}%`); } return out; }
+  const types=await embed(typeTexts), brands=await embed(brandTexts);
+  try{ const dim=types[0].length; localStorage.setItem(CACHE_KEY, JSON.stringify({dim, t:toB64(new Float32Array(types.flat())), b:toB64(new Float32Array(brands.flat()))})); }catch{}
+  try{ await tm.dispose(); }catch{}
+  return {types,brands};
+}
+function softmax(sims){ const m=Math.max(...sims); const e=sims.map(s=>Math.exp((s-m)*100)); const z=e.reduce((a,b)=>a+b,0); return e.map(x=>x/z); }
+
+window.CLIPX = { ready:false, classify:null };
+const hasCloudKey = (()=>{ try{ return localStorage.getItem("procura.cloud")==="1"; }catch{ return false; } })();
+if(!hasCloudKey) (async()=>{
+  try{
+    const [emb, proc, vm] = await Promise.all([
+      textEmbeds(),
+      AutoProcessor.from_pretrained(ID),
+      CLIPVisionModelWithProjection.from_pretrained(ID,{dtype:"q8",progress_callback:onProg})
+    ]);
+    window.CLIPX.classify = async (canvas)=>{
+      const img = RawImage.fromCanvas(canvas);
+      const inputs = await proc(img);
+      const { image_embeds } = await vm(inputs);
+      const v = norm(Array.from(image_embeds.data));
+      const dot = e=>{ let a=0; for(let i=0;i<e.length;i++) a+=e[i]*v[i]; return a; };
+      const tp = softmax(emb.types.map(dot));
+      const order = tp.map((p,i)=>[p,i]).sort((a,b)=>b[0]-a[0]).slice(0,5);
+      const bp = softmax(emb.brands.map(dot));
+      const bi = bp.indexOf(Math.max(...bp));
+      const brand = (bi < BRANDS_EN.length && bp[bi] > .30) ? {name:BRANDS_EN[bi], p:bp[bi]} : null;
+      return { types: order.map(([p,i])=>({en:TYPES[i][0], pt:TYPES[i][1], p})), brand };
+    };
+    window.CLIPX.ready = true;
+    const el=document.getElementById("mstatus"); if(el && !hasCloudKey) el.textContent="IA avançada pronta · grátis, roda no aparelho";
+  }catch(e){ console.error(e); const el=document.getElementById("mstatus"); if(el) el.textContent="IA avançada indisponível · usando a básica"; }
+})();
+</script>
+</body>
+</html>

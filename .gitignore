@@ -1,0 +1,8 @@
+# nunca subir versões com chave pessoal
+*teste-andre*.html
+*-pronto.html
+.env
+
+# documentação e banco ficam só na máquina (repo é público)
+*.md
+supabase/

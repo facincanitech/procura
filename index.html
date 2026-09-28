@@ -106,6 +106,14 @@ main{padding:32px 24px 60px;max-width:1200px;width:100%;margin:0 auto}
 .tile span{font-size:14px;color:var(--muted)}
 .tile.hi{background:var(--dark);border-color:var(--dark);color:#fff}
 .tile.hi span{color:#b9c2b5} .tile.hi .ic{background:var(--accent)}
+.banner{background:#fff3c7;border:1px solid #f0d77a;border-radius:14px;padding:14px 16px;margin-bottom:20px;font-size:14px}
+.banner.warn{background:#fbe9e2;border-color:#efb9a4}
+.tk{display:flex;justify-content:space-between;align-items:center;gap:12px;text-decoration:none}
+.card.tk:hover{border-color:#cfccbf}
+tr.clk{cursor:pointer} tr.clk:hover td{background:#faf9f4}
+.msgs{display:flex;flex-direction:column;gap:10px;max-width:760px}
+.msg{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;max-width:85%;display:flex;flex-direction:column;gap:4px}
+.msg.me{align-self:flex-end;background:#fff8dc;border-color:#f0d77a}
 .recent{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
 .top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap}
 .top h1{font-size:32px}
@@ -221,7 +229,7 @@ const FLUXO = ["pago","separando","pronto","em_transito","entregue"];
 const PAGAMENTOS = { pix:"PIX", credito:"Cartão de crédito", debito:"Cartão de débito", dinheiro:"Dinheiro", boleto:"Boleto", faturado:"Faturado (a prazo)" };
 const pagTxt = arr => (arr||[]).map(k=>PAGAMENTOS[k]||k).join(" · ");
 const pagChecks = (id, sel) => `<div class="opts" id="${id}" style="margin-top:0">${Object.entries(PAGAMENTOS).map(([k,t])=>`<label class="check"><input type="checkbox" value="${k}"${(sel||[]).includes(k)?" checked":""}> ${t}</label>`).join("")}</div>`;
-const pagLidos = id => $(`#${id} input:checked`).map(i=>i.value);
+const pagLidos = id => $$(`#${id} input:checked`).map(i=>i.value);
 
 /* ---------- utilidades ---------- */
 const $ = (s, r=document) => r.querySelector(s);
@@ -236,8 +244,8 @@ function safeURL(u){ try{ const x=new URL(u); return /^https?:$/.test(x.protocol
 let tt; function toast(m){ let t=$(".toast"); if(!t){ t=document.createElement("div"); t.className="toast"; document.body.appendChild(t); } t.textContent=m; t.hidden=false; clearTimeout(tt); tt=setTimeout(()=>t.hidden=true, 3200); }
 function errMsg(e){
   const m = (e && (e.message || e.error_description)) || String(e);
-  if(/Invalid login credentials/i.test(m)) return "E-mail ou senha errados.";
-  if(/already registered|already been registered/i.test(m)) return "Esse e-mail já tem conta. Use Entrar.";
+  if(/Invalid login credentials/i.test(m)) return "CPF/CNPJ ou senha errados.";
+  if(/already registered|already been registered|already exists/i.test(m)) return "Esse CPF/CNPJ já tem conta. Use Entrar.";
   if(/perfis_cpf_key/.test(m)) return "Esse CPF já tem conta.";
   if(/perfis_cnpj_key/.test(m)) return "Esse CNPJ já tem conta.";
   if(/Password should be/i.test(m)) return "A senha precisa ter pelo menos 6 caracteres.";
@@ -295,7 +303,7 @@ async function loadPerfil(){
 async function boot(){
   await loadPerfil();
   if(!S.user || !S.perfil) renderAuth(S.user ? "completar" : "entrar");
-  else { if(!location.hash) location.hash = S.perfil.tipo==="vendedor" ? "#itens" : "#inicio"; route(); }
+  else { if(!location.hash) location.hash = inicioDe(S.perfil); route(); }
 }
 sb.auth.onAuthStateChange(ev => { if(ev==="SIGNED_OUT"){ S.user=null; S.perfil=null; history.replaceState(null,"",location.pathname); renderAuth("entrar"); } });
 window.addEventListener("hashchange", () => { if(S.perfil) route(); });
@@ -315,6 +323,7 @@ function renderAuth(modo){
         <li><i>2</i><span><b>Compra de várias lojas num pedido só.</b> Cada loja separa e entrega a sua parte.</span></li>
         <li><i>3</i><span><b>Reputação dos dois lados.</b> Estrelas de 0 a 5 depois de cada entrega.</span></li>
       </ul>
+      <div class="row" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn primary" type="button" id="hero-emp">Tem uma empresa? Cadastre sua loja</button></div>
       <div class="appbox">
         <b>App Procura: aponte a câmera para o produto</b>
         <span class="small" style="color:#b9c2b5">A IA identifica o item e acha o menor preço na internet. Tudo que você procura fica salvo na sua biblioteca aqui no site.</span>
@@ -327,37 +336,54 @@ function renderAuth(modo){
     <section class="auth-side"><div class="auth-card" id="auth-card"></div></section>
   </div>`;
   authForm(modo);
+  $("#hero-emp").onclick = () => authForm("criar","vendedor");
 }
+// Login é CPF/CNPJ + senha. O Supabase exige e-mail, então cada conta usa um endereço interno que nunca recebe mensagem.
+const loginEmail = (doc, tipo) => `${String(doc).toLowerCase()}@${tipo}.procura.invalid`;
+function docDoLogin(v){ const c=cnpjClean(v); if(/^\d{11}$/.test(c)) return { tipo:"cpf", doc:c }; if(c.length===14) return { tipo:"cnpj", doc:c }; return null; }
+function docDaConta(user){ const m=String(user?.email||"").match(/^([0-9a-z]+)@(cpf|cnpj)\.procura\.invalid$/); return m ? { tipo:m[2], doc:m[1].toUpperCase() } : null; }
+const maskDoc = v => { const c=cnpjClean(v); return (c.length<=11 && /^\d*$/.test(c)) ? maskCPF(c) : maskCNPJ(c); };
+
 function authForm(modo, tipo){
   tipo = tipo || "comprador";
   const c = $("#auth-card");
   if(modo==="entrar"){
     c.innerHTML = `<div><p class="eyebrow">Bem-vindo</p><h2>Entrar no Procura</h2></div>
       <form class="form" id="f-login" novalidate>
-        <div><label class="f" for="l-email">E-mail</label><input class="in" id="l-email" type="email" autocomplete="email" required></div>
-        <div><label class="f" for="l-senha">Senha</label><input class="in" id="l-senha" type="password" autocomplete="current-password" required></div>
+        <div><label class="f" for="l-doc">CPF ou CNPJ</label><input class="in" id="l-doc" inputmode="text" autocomplete="username" placeholder="000.000.000-00 ou 00.000.000/0000-00"></div>
+        <div><label class="f" for="l-senha">Senha</label><input class="in" id="l-senha" type="password" autocomplete="current-password"></div>
         <button class="btn primary block" type="submit">Entrar</button>
       </form>
-      <div class="small">Ainda não tem conta? <a href="#" id="go-cad"><b>Criar conta</b></a> · <a href="#" id="go-reset">Esqueci a senha</a></div>`;
-    $("#go-cad").onclick = e => { e.preventDefault(); authForm("criar"); };
-    $("#go-reset").onclick = async e => { e.preventDefault(); const em=$("#l-email").value.trim(); if(!em) return toast("Digite seu e-mail primeiro");
-      const { error } = await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin+location.pathname }); toast(error?errMsg(error):"Enviamos um link para seu e-mail"); };
-    $("#f-login").onsubmit = async e => { e.preventDefault(); const b=e.submitter; b.disabled=true;
-      const { error } = await sb.auth.signInWithPassword({ email:$("#l-email").value.trim(), password:$("#l-senha").value });
+      <div class="small"><a href="#" id="go-reset">Esqueci a senha</a></div>
+      <div class="stack" style="gap:10px;border-top:1px solid var(--line);padding-top:18px">
+        <span class="small">Ainda não tem conta?</span>
+        <button class="btn block" type="button" id="go-cad-c">Criar conta de comprador · CPF</button>
+        <button class="btn dark block" type="button" id="go-cad-v">Cadastrar minha empresa · CNPJ</button>
+      </div>`;
+    $("#go-cad-c").onclick = () => authForm("criar","comprador");
+    $("#go-cad-v").onclick = () => authForm("criar","vendedor");
+    $("#go-reset").onclick = e => { e.preventDefault(); toast("Para trocar a senha, fale com a administração do Procura."); };
+    $("#l-doc").oninput = e => e.target.value = maskDoc(e.target.value);
+    $("#f-login").onsubmit = async e => { e.preventDefault();
+      const d = docDoLogin($("#l-doc").value); if(!d) return toast("Digite um CPF ou CNPJ completo");
+      const b=e.submitter; b.disabled=true;
+      const { error } = await sb.auth.signInWithPassword({ email:loginEmail(d.doc,d.tipo), password:$("#l-senha").value });
       b.disabled=false; if(error) return toast(errMsg(error)); await afterAuth(); };
     return;
   }
   const completar = modo==="completar";
-  c.innerHTML = `<div><p class="eyebrow">${completar?"Falta pouco":"Nova conta"}</p><h2>${completar?"Complete seu cadastro":"Criar conta"}</h2></div>
-    <div class="seg" role="group" aria-label="Tipo de conta">
+  const conta = completar ? docDaConta(S.user) : null;   // cadastro interrompido: o documento é o do login
+  if(conta) tipo = conta.tipo==="cnpj" ? "vendedor" : "comprador";
+  c.innerHTML = `<div><p class="eyebrow">${completar?"Falta pouco":"Nova conta"}</p><h2>${completar?"Complete seu cadastro":tipo==="vendedor"?"Cadastrar empresa":"Criar conta de comprador"}</h2></div>
+    ${conta?"":`<div class="seg" role="group" aria-label="Tipo de conta">
       <button type="button" data-t="comprador" aria-pressed="${tipo==="comprador"}">Comprador · CPF</button>
-      <button type="button" data-t="vendedor" aria-pressed="${tipo==="vendedor"}">Vendedor · CNPJ</button>
-    </div>
+      <button type="button" data-t="vendedor" aria-pressed="${tipo==="vendedor"}">Empresa · CNPJ</button>
+    </div>`}
     <form class="form" id="f-cad" novalidate>
       ${tipo==="comprador" ? `
-        <div><label class="f" for="c-nome">Nome completo</label><input class="in" id="c-nome" autocomplete="name"></div>
+        <div><label class="f" for="c-nome">Nome completo (igual ao documento)</label><input class="in" id="c-nome" autocomplete="name"></div>
         <div class="grid2">
-          <div><label class="f" for="c-cpf">CPF</label><input class="in" id="c-cpf" inputmode="numeric" placeholder="000.000.000-00"><div id="c-cpf-msg"></div></div>
+          <div><label class="f" for="c-cpf">CPF</label><input class="in" id="c-cpf" inputmode="numeric" placeholder="000.000.000-00"${conta?` value="${esc(maskCPF(conta.doc))}" readonly`:""}><div id="c-cpf-msg"></div></div>
           <div><label class="f" for="c-cel">Celular / WhatsApp</label><input class="in" id="c-cel" inputmode="tel" placeholder="(17) 99999-9999"></div>
         </div>
         <div class="grid2">
@@ -365,7 +391,7 @@ function authForm(modo, tipo){
           <div><label class="f" for="c-cidade">Cidade</label><input class="in" id="c-cidade" placeholder="preenche pelo CEP"></div>
         </div>` : `
         <div><label class="f" for="v-cnpj">CNPJ</label>
-          <div style="display:flex;gap:8px"><input class="in" id="v-cnpj" placeholder="00.000.000/0000-00" style="flex:1"><button class="btn" type="button" id="v-buscar">Buscar</button></div>
+          <div style="display:flex;gap:8px"><input class="in" id="v-cnpj" placeholder="00.000.000/0000-00" style="flex:1"${conta?` value="${esc(maskCNPJ(conta.doc))}" readonly`:""}><button class="btn" type="button" id="v-buscar">Buscar</button></div>
           <div id="v-cnpj-msg"></div></div>
         <div class="cobox" id="v-dados" hidden></div>
         <div class="grid2">
@@ -374,13 +400,16 @@ function authForm(modo, tipo){
         </div>
         <div><label class="f" for="v-raio">Atende até</label><select class="in" id="v-raio"><option value="10">10 km</option><option value="30" selected>30 km</option><option value="100">100 km</option><option value="500">500 km</option></select></div>
         <div><label class="f">Formas de pagamento que a loja aceita</label>${pagChecks("v-pag",["pix","dinheiro","credito","debito"])}</div>`}
+      <div><label class="f" for="a-email">E-mail para contato (opcional)</label><input class="in" id="a-email" type="email" autocomplete="email"></div>
       ${completar ? "" : `<div class="grid2">
-        <div><label class="f" for="a-email">E-mail</label><input class="in" id="a-email" type="email" autocomplete="email"></div>
         <div><label class="f" for="a-senha">Senha (6+)</label><input class="in" id="a-senha" type="password" autocomplete="new-password"></div>
+        <div><label class="f" for="a-senha2">Repita a senha</label><input class="in" id="a-senha2" type="password" autocomplete="new-password"></div>
       </div>`}
-      <button class="btn primary block" type="submit">${tipo==="comprador"?"Criar conta de comprador":"Cadastrar minha empresa"}</button>
+      <button class="btn primary block" type="submit">${tipo==="comprador"?"Criar conta":"Enviar cadastro da empresa"}</button>
     </form>
-    <div class="small">${tipo==="comprador" ? "O CPF é conferido pelo dígito verificador e fica visível só para você." : "Os dados vêm da base pública do CNPJ. Só empresas com situação ATIVA podem se cadastrar."}</div>
+    <div class="small">${tipo==="comprador"
+      ? "Você entra com CPF e senha. Para comprar, envie depois uma foto do seu documento em Minha conta: a conferência é automática."
+      : "Você entra com CNPJ e senha. Só empresas com situação ATIVA. Depois do envio, a administração do Procura confere os dados e libera o cadastro de itens. Você acompanha pelo Suporte."}</div>
     <div class="small">${completar ? `<a href="#" id="go-sair">Sair</a>` : `Já tem conta? <a href="#" id="go-login"><b>Entrar</b></a>`}</div>`;
   $$("[data-t]", c).forEach(b => b.onclick = () => authForm(modo, b.dataset.t));
   if(completar) $("#go-sair").onclick = e => { e.preventDefault(); sb.auth.signOut(); };
@@ -410,12 +439,15 @@ function authForm(modo, tipo){
     $("#v-cnpj").oninput = e => { e.target.value=maskCNPJ(e.target.value); S.cnpj=null; if(cnpjClean(e.target.value).length===14) buscar(); else { $("#v-cnpj-msg").innerHTML=""; $("#v-dados").hidden=true; } };
     $("#v-buscar").onclick = buscar;
     $("#v-cel").oninput = e => e.target.value=maskTel(e.target.value);
+    if(conta) buscar();
   }
 
   $("#f-cad").onsubmit = async e => {
     e.preventDefault();
     const btn = e.submitter;
-    let perfil;
+    const contato = $("#a-email").value.trim();
+    if(contato && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contato)) return toast("E-mail de contato inválido");
+    let perfil, doc, dtipo;
     if(tipo==="comprador"){
       const nome=$("#c-nome").value.trim(), cpf=onlyDigits($("#c-cpf").value);
       if(nome.split(/\s+/).length<2) return toast("Digite nome e sobrenome");
@@ -423,6 +455,7 @@ function authForm(modo, tipo){
       if(onlyDigits($("#c-cel").value).length<10) return toast("Digite o celular com DDD");
       const [cid,uf] = $("#c-cidade").value.split("/").map(s=>s&&s.trim());
       perfil = { tipo:"comprador", nome, cpf, celular:$("#c-cel").value, cep:$("#c-cep").value||null, cidade:cid||null, uf:uf||null, lat:S.cep?.lat??null, lng:S.cep?.lng??null };
+      doc=cpf; dtipo="cpf";
     } else {
       if(!S.cnpj) return toast("Busque um CNPJ com situação ATIVA");
       if(onlyDigits($("#v-cel").value).length<10) return toast("Digite o WhatsApp com DDD");
@@ -431,19 +464,21 @@ function authForm(modo, tipo){
         atividade:d.atividade||null, situacao:"ATIVA", endereco:d.endereco||null, cidade:d.cidade||null, uf:d.uf||null, cep:d.cep||null,
         celular:$("#v-cel").value, raio_entrega_km:+$("#v-raio").value, pagamentos:pagLidos("v-pag"), lat:g?.lat??null, lng:g?.lng??null };
       if(!perfil.pagamentos.length) return toast("Marque pelo menos uma forma de pagamento");
+      doc=d.cnpj; dtipo="cnpj";
     }
+    perfil.email = contato || null;
     btn.disabled = true;
     try{
       if(!completar){
-        const email=$("#a-email").value.trim(), password=$("#a-senha").value;
-        if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Digite um e-mail válido");
+        const password=$("#a-senha").value;
         if(password.length<6) throw new Error("A senha precisa ter pelo menos 6 caracteres");
-        const { data, error } = await sb.auth.signUp({ email, password });
+        if(password!==$("#a-senha2").value) throw new Error("As senhas não conferem");
+        const { data, error } = await sb.auth.signUp({ email:loginEmail(doc,dtipo), password });
         if(error) throw error;
-        if(!data.session){ LS.set("procura.pendente", JSON.stringify(perfil)); toast("Conta criada! Confirme pelo link no seu e-mail e depois entre."); authForm("entrar"); return; }
+        if(!data.session) throw new Error("Não consegui entrar na conta nova. Tente Entrar.");
       }
       await criarPerfil(perfil);
-      toast(tipo==="comprador" ? "Conta criada" : "Empresa cadastrada");
+      toast(tipo==="comprador" ? "Conta criada" : "Cadastro enviado para aprovação");
       await afterAuth();
     }catch(err){ toast(errMsg(err)); }
     finally{ btn.disabled = false; }
@@ -451,15 +486,15 @@ function authForm(modo, tipo){
 }
 async function criarPerfil(perfil){
   const { data:{ user } } = await sb.auth.getUser();
-  const { error } = await sb.from("perfis").insert({ ...perfil, id:user.id, email:user.email });
+  const { error } = await sb.from("perfis").insert({ ...perfil, id:user.id });
   if(error) throw error;
 }
+const inicioDe = p => p.admin ? "#adm" : p.tipo==="vendedor" ? "#itens" : "#inicio";
 async function afterAuth(){
   await loadPerfil();
-  // cadastro feito antes de confirmar o e-mail: grava o perfil no primeiro login
-  if(S.user && !S.perfil){ const p=LS.get("procura.pendente"); if(p){ try{ await criarPerfil(JSON.parse(p)); LS.set("procura.pendente",""); await loadPerfil(); }catch(e){ toast(errMsg(e)); } } }
   if(!S.perfil) return renderAuth("completar");
-  location.hash = S.perfil.tipo==="vendedor" ? "#itens" : "#inicio";
+  $("#shell")?.remove();
+  location.hash = inicioDe(S.perfil);
   route();
 }
 
@@ -467,21 +502,22 @@ async function afterAuth(){
    ESTRUTURA LOGADA
    ===================================================================== */
 const MENU = {
-  comprador:[["inicio","Início"],["buscar","Buscar"],["procuras","Histórico de procuras"],["compras","Histórico de compras"],["carrinho","Carrinho"],["conta","Minha conta"]],
-  vendedor:[["itens","Meus itens"],["vendas","Vendas"],["loja","Minha loja"]]
+  comprador:[["inicio","Início"],["buscar","Buscar"],["procuras","Histórico de procuras"],["compras","Histórico de compras"],["carrinho","Carrinho"],["suporte","Suporte"],["conta","Minha conta"]],
+  vendedor:[["itens","Meus itens"],["vendas","Vendas"],["suporte","Aprovação e suporte"],["loja","Minha loja"]]
 };
+const menuDe = p => p.admin ? [["adm","⚙ Gerenciar"], ...MENU.comprador] : MENU[p.tipo];
 function shell(){
   if($("#shell")) return;
   const p=S.perfil, comp=p.tipo==="comprador";
   $("#root").innerHTML = `<div id="shell">
     <header class="bar">
       <div class="bar-in">
-        <a class="logo" href="#${MENU[p.tipo][0][0]}">procur<b>a</b></a>
+        <a class="logo" href="${inicioDe(p)}">procur<b>a</b></a>
         ${comp?`<form id="f-top" role="search"><input id="top-q" placeholder="Buscar produtos nas lojas da região…" aria-label="Buscar produtos"><button type="submit">Buscar</button></form>`
               :`<span style="font-weight:600">Painel da empresa</span>`}
         <div class="who"><b>${esc(comp?p.nome.split(" ")[0]:(p.fantasia||p.nome))}</b><button id="btn-sair" type="button">Sair</button></div>
       </div>
-      <nav>${MENU[p.tipo].map(([k,t])=>`<a href="#${k}">${t}${k==="carrinho"?`<span class="n" id="cart-n" hidden></span>`:""}</a>`).join("")}</nav>
+      <nav>${menuDe(p).map(([k,t])=>`<a href="#${k}">${t}${k==="carrinho"?`<span class="n" id="cart-n" hidden></span>`:""}</a>`).join("")}</nav>
     </header>
     <main id="main"></main>
   </div>`;
@@ -507,13 +543,21 @@ async function vInicio(){
     ${p.foto_url?`<img src="${esc(p.foto_url)}" alt="" loading="lazy">`:`<span class="ph">▢</span>`}<div><h3 style="font-size:14px">${esc(p.titulo)}</h3><span class="small">${dataBR(p.criado_em)}</span></div></a>`).join("")}</div>`;
 }
 function updateCartBadge(){ const n=$("#cart-n"); if(!n) return; const c=cart.get().length; n.textContent=c; n.hidden=!c; }
+let ROTA = 0;
+const naRota = t => t === ROTA;
 function route(){
+  ROTA++;
   shell();
   const [k, arg] = location.hash.slice(1).split("/");
-  const allowed = MENU[S.perfil.tipo].map(m=>m[0]).concat(S.perfil.tipo==="vendedor"?["item"]:[]);
-  const view = allowed.includes(k) ? k : MENU[S.perfil.tipo][0][0];
-  $$("nav a").forEach(a => a.getAttribute("href")==="#"+(view==="item"?"itens":view) ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"));
-  const V = { inicio:vInicio, buscar:vBuscar, carrinho:vCarrinho, compras:vCompras, procuras:vProcuras, conta:vConta, itens:vItens, item:vItem, vendas:vVendas, loja:vConta };
+  const p = S.perfil;
+  const extra = { vendedor:["item","ticket"], comprador:["ticket"] }[p.tipo] || [];
+  const admin = p.admin ? ["adm-empresas","adm-empresa","adm-usuarios","adm-usuario","adm-tickets"] : [];
+  const allowed = menuDe(p).map(m=>m[0]).concat(extra, admin);
+  const view = allowed.includes(k) ? k : menuDe(p)[0][0];
+  const ativo = { item:"itens", ticket:"suporte" }[view] || (view.startsWith("adm") ? "adm" : view);
+  $$("nav a").forEach(a => a.getAttribute("href")==="#"+ativo ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"));
+  const V = { inicio:vInicio, buscar:vBuscar, carrinho:vCarrinho, compras:vCompras, procuras:vProcuras, conta:vConta, itens:vItens, item:vItem, vendas:vVendas, loja:vConta,
+    suporte:vSuporte, ticket:vTicket, adm:vAdm, "adm-empresas":vAdmEmpresas, "adm-empresa":vAdmEmpresa, "adm-usuarios":vAdmUsuarios, "adm-usuario":vAdmUsuario, "adm-tickets":vAdmTickets };
   window.scrollTo(0,0);
   V[view](arg);
 }
@@ -604,6 +648,7 @@ function vCarrinho(){
         <div><label class="f" for="f-pag">Forma de pagamento</label>${pags.length?`<select class="in" id="f-pag">${pags.map(k=>`<option value="${k}">${PAGAMENTOS[k]}</option>`).join("")}</select>`
           :`<div class="err">As lojas deste carrinho não têm forma de pagamento em comum. Faça um pedido por loja.</div>`}</div>
         <div class="sum"><span class="muted">Subtotal</span><span>${brl(total)}</span><span class="muted">Frete</span><span>a combinar</span><span><b>Total</b></span><span class="t">${brl(total)}</span></div>
+        ${S.perfil.verificacao!=="aprovado"?`<div class="banner" style="margin:0">Para fechar o pedido, verifique seu CPF em <a href="#conta">Minha conta</a> (foto do documento).</div>`:""}
         <button class="btn primary block" type="submit">Fechar pedido</button>
         <div class="small">Depois de fechar, o pedido aparece em Compras para pagamento.</div>
       </form>
@@ -706,7 +751,7 @@ document.getElementById("dlg").addEventListener("click", e=>{ if(e.target.id==="
    ===================================================================== */
 function vConta(){
   const p=S.perfil, vend=p.tipo==="vendedor";
-  main().innerHTML = `<div class="top"><div><p class="eyebrow">${vend?"Loja":"Conta"}</p><h1>${vend?"Minha loja":"Minha conta"}</h1></div><div id="rep"></div></div>
+  main().innerHTML = `${bannerEmpresa()}<div id="verif" style="margin-bottom:20px"></div><div class="top"><div><p class="eyebrow">${vend?"Loja":"Conta"}</p><h1>${vend?"Minha loja":"Minha conta"}</h1></div><div id="rep"></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start" class="contagrid">
       <form class="card form" id="f-conta">
         ${vend?`<div><label class="f" for="k-fant">Nome da loja</label><input class="in" id="k-fant" value="${esc(p.fantasia||"")}"></div>`:`<div><label class="f" for="k-nome">Nome</label><input class="in" id="k-nome" value="${esc(p.nome)}"></div>`}
@@ -722,12 +767,13 @@ function vConta(){
       <div class="card stack">
         <p class="eyebrow" style="margin:0">Dados do cadastro</p>
         <dl>${vend?`<dt>CNPJ</dt><dd>${esc(maskCNPJ(p.cnpj))}</dd><dt>Razão social</dt><dd>${esc(p.razao_social||"")}</dd><dt>Atividade</dt><dd>${esc(p.atividade||"")}</dd><dt>Situação</dt><dd>${esc(p.situacao||"")}</dd>`
-          :`<dt>CPF</dt><dd>${esc(maskCPF(p.cpf))}</dd>`}<dt>E-mail</dt><dd>${esc(p.email||S.user.email)}</dd><dt>Desde</dt><dd>${new Date(p.criado_em).toLocaleDateString("pt-BR")}</dd></dl>
+          :`<dt>CPF</dt><dd>${esc(maskCPF(p.cpf))}</dd>`}<dt>E-mail de contato</dt><dd>${esc(p.email||"—")}</dd><dt>Desde</dt><dd>${new Date(p.criado_em).toLocaleDateString("pt-BR")}</dd></dl>
         <span class="small">${vend?"CNPJ e razão social vêm da base pública e não podem ser alterados.":"O CPF não pode ser alterado."}</span>
         <button class="btn" id="k-sair" type="button">Sair da conta</button>
       </div>
     </div>`;
   if(matchMedia("(max-width:980px)").matches) $(".contagrid").style.gridTemplateColumns="1fr";
+  if(!vend) cartaoVerificacao($("#verif")); else $("#verif").remove();
   sb.rpc("reputacao_de",{p_id:p.id}).then(({data})=>{ const r=data?.[0]; if(r && $("#rep")) $("#rep").innerHTML=`<span class="small">Sua reputação</span><br>${starsHTML(r.media,r.n)}`; });
   $("#k-sair").onclick=()=>sb.auth.signOut();
   $("#k-cel").oninput=e=>e.target.value=maskTel(e.target.value);
@@ -745,9 +791,11 @@ function vConta(){
    VENDEDOR
    ===================================================================== */
 async function vItens(){
-  main().innerHTML = `<div class="top"><div><p class="eyebrow">Catálogo</p><h1>Meus itens</h1></div>
-    <div style="display:flex;gap:10px"><input class="in" id="i-f" placeholder="Filtrar…" style="width:220px"><a class="btn primary" href="#item/novo">+ Cadastrar item</a></div></div>
-    <div id="tb"><div class="spin">Carregando…</div></div>`;
+  const liberado = S.perfil.verificacao==="aprovado";
+  main().innerHTML = `${bannerEmpresa()}<div class="top"><div><p class="eyebrow">Catálogo</p><h1>Meus itens</h1></div>
+    <div style="display:flex;gap:10px"><input class="in" id="i-f" placeholder="Filtrar…" style="width:220px">${liberado?`<a class="btn primary" href="#item/novo">+ Cadastrar item</a>`:`<button class="btn" disabled title="Liberado depois da aprovação">+ Cadastrar item</button>`}</div></div>
+    ${liberado?`<div id="tb"><div class="spin">Carregando…</div></div>`:`<div class="empty"><b>Cadastro de itens bloqueado</b>Liberado assim que a administração aprovar sua empresa.</div>`}`;
+  if(!liberado) return;
   const { data, error } = await sb.from("produtos").select("*").order("criado_em",{ascending:false});
   if(error) return toast(errMsg(error));
   if(!$("#tb")) return;
@@ -776,6 +824,7 @@ async function vItens(){
 }
 
 async function vItem(id){
+  if(S.perfil.verificacao!=="aprovado"){ toast("Liberado depois da aprovação da empresa"); location.hash="#itens"; return; }
   let p = { nome:"", marca:"", modelo:"", categoria:"", descricao:"", preco:"", unidade:"un", estoque:0, pronta_entrega:true, prazo_dias:null, peso_kg:null, altura_cm:null, largura_cm:null, comprimento_cm:null, fotos:[], ativo:true };
   if(id && id!=="novo"){ const { data, error } = await sb.from("produtos").select("*").eq("id",+id).maybeSingle(); if(error||!data){ toast("Item não encontrado"); location.hash="#itens"; return; } p=data; }
   const novo = !p.id; let fotos=[...p.fotos];
@@ -858,7 +907,7 @@ async function uploadFoto(file){
 function storagePath(url, bucket){ const m=String(url||"").match(new RegExp(`/storage/v1/object/public/${bucket}/(.+)$`)); return m?decodeURIComponent(m[1]):null; }
 
 async function vVendas(){
-  main().innerHTML = `<div class="top"><div><p class="eyebrow">Pedidos recebidos</p><h1>Vendas</h1></div><div id="vt"></div></div><div id="lst" class="stack"><div class="spin">Carregando…</div></div>`;
+  main().innerHTML = `${bannerEmpresa()}<div class="top"><div><p class="eyebrow">Pedidos recebidos</p><h1>Vendas</h1></div><div id="vt"></div></div><div id="lst" class="stack"><div class="spin">Carregando…</div></div>`;
   const { data, error } = await sb.rpc("minhas_vendas");
   if(error) return toast(errMsg(error));
   const el=$("#lst"); if(!el || !$("#vt")) return;
@@ -881,6 +930,225 @@ async function vVendas(){
   </div>`).join("");
   $$("[data-st]").forEach(b=>b.onclick=async()=>{ b.disabled=true; const { error }=await sb.rpc("atualizar_venda",{p_id:+b.dataset.st,p_status:b.dataset.to}); if(error){ b.disabled=false; return toast(errMsg(error)); } vVendas(); });
   bindRates(el, vVendas);
+}
+
+
+/* =====================================================================
+   VERIFICAÇÃO (empresa aguardando aprovação · CPF por foto do documento)
+   ===================================================================== */
+const VERIF = { sem_documento:["Sem documento",""], em_analise:["Em análise","acc"], aprovado:["Aprovado","ok"], rejeitado:["Rejeitado","warn"] };
+const verifPill = v => { const [t,c]=VERIF[v]||[v,""]; return `<span class="pill ${c}">${esc(t)}</span>`; };
+function bannerEmpresa(){
+  const p=S.perfil; if(p.tipo!=="vendedor" || p.verificacao==="aprovado") return "";
+  return p.verificacao==="rejeitado"
+    ? `<div class="banner warn"><b>Cadastro não aprovado.</b> ${esc(p.verificacao_obs||"")} Fale com a administração em <a href="#suporte">Aprovação e suporte</a>.</div>`
+    : `<div class="banner"><b>Cadastro em análise.</b> A administração do Procura está conferindo os dados da empresa. O cadastro de itens é liberado depois da aprovação. Acompanhe e envie o que for pedido em <a href="#suporte">Aprovação e suporte</a>.</div>`;
+}
+async function cartaoVerificacao(el){
+  const p=S.perfil; if(p.tipo!=="comprador") return;
+  const st=p.verificacao;
+  el.innerHTML = `<div class="card stack">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><p class="eyebrow" style="margin:0">Verificação do CPF</p>${verifPill(st)}</div>
+    ${st==="aprovado" ? `<span class="small">CPF verificado. Você já pode comprar.</span>`
+    : st==="em_analise" ? `<span class="small">Recebemos seu documento. ${esc(p.verificacao_obs||"")} A administração vai conferir em breve.</span>`
+    : `<span class="small">${st==="rejeitado"?`Documento não aprovado. ${esc(p.verificacao_obs||"")} Envie outra foto.`:"Para comprar, envie uma foto do seu documento (RG ou CNH) com o CPF e o nome legíveis. A conferência é automática na maioria dos casos."}</span>
+       <label class="btn primary" for="doc-file" style="align-self:flex-start">Enviar foto do documento</label>
+       <input type="file" id="doc-file" accept="image/*" capture="environment" hidden>
+       <span class="small">A foto fica guardada em área privada: só você e a administração do Procura têm acesso.</span>`}
+  </div>`;
+  const inp=$("#doc-file", el); if(!inp) return;
+  inp.onchange = async e => {
+    const f=e.target.files[0]; e.target.value=""; if(!f) return;
+    const lbl=$("label[for=doc-file]", el); lbl.textContent="Enviando e conferindo…"; lbl.style.pointerEvents="none";
+    try{
+      const blob = await reduzir(f, 1600, .88);
+      const path = `${S.user.id}/${crypto.randomUUID()}.jpg`;
+      const { error:e1 } = await sb.storage.from("documentos").upload(path, blob, { contentType:"image/jpeg" });
+      if(e1) throw e1;
+      const { data, error:e2 } = await sb.functions.invoke("verificar-documento", { body:{ path } });
+      if(e2){ let m=e2.message; try{ const j=await e2.context?.json(); if(j?.erro) m=j.erro; }catch{} throw new Error(m); }
+      if(data?.erro) throw new Error(data.erro);
+      toast(data.status==="aprovado" ? "CPF verificado!" : "Documento enviado para análise");
+      await loadPerfil(); cartaoVerificacao(el);
+    }catch(err){ toast(errMsg(err)); lbl.textContent="Enviar foto do documento"; lbl.style.pointerEvents=""; }
+  };
+}
+async function reduzir(file, max, q){
+  const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error("arquivo não é imagem")); i.src=URL.createObjectURL(file); });
+  const k=Math.min(1,max/Math.max(img.width,img.height)), c=document.createElement("canvas"); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+  c.getContext("2d").drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(img.src);
+  return await new Promise(r=>c.toBlob(r,"image/jpeg",q));
+}
+
+/* =====================================================================
+   SUPORTE / TICKETS (usuário e empresa)
+   ===================================================================== */
+const TSTATUS = { aberto:["Aguardando resposta","acc"], respondido:["Respondido","info"], fechado:["Fechado",""] };
+const tPill = s => { const [t,c]=TSTATUS[s]||[s,""]; return `<span class="pill ${c}">${esc(t)}</span>`; };
+async function vSuporte(){
+  const vend=S.perfil.tipo==="vendedor";
+  main().innerHTML = `${bannerEmpresa()}<div class="top"><div><p class="eyebrow">Fale com o Procura</p><h1>${vend?"Aprovação e suporte":"Suporte"}</h1></div>
+      <button class="btn primary" id="t-novo">+ Novo chamado</button></div>
+    <form class="card form" id="f-novo" hidden style="margin-bottom:16px">
+      <div><label class="f" for="n-ass">Assunto</label><input class="in" id="n-ass" maxlength="160"></div>
+      <div><label class="f" for="n-txt">Mensagem</label><textarea class="in" id="n-txt" maxlength="4000"></textarea></div>
+      <div><button class="btn primary" type="submit">Enviar</button></div>
+    </form>
+    <div id="tl" class="stack"><div class="spin">Carregando…</div></div>`;
+  $("#t-novo").onclick = () => { $("#f-novo").hidden=!$("#f-novo").hidden; $("#n-ass").focus(); };
+  $("#f-novo").onsubmit = async e => { e.preventDefault(); const a=$("#n-ass").value.trim(), t=$("#n-txt").value.trim();
+    if(a.length<2||!t) return toast("Preencha assunto e mensagem");
+    const { data, error } = await sb.from("tickets").insert({ perfil_id:S.user.id, tipo:"suporte", assunto:a }).select("id").single(); if(error) return toast(errMsg(error));
+    const { error:e2 } = await sb.from("ticket_msgs").insert({ ticket_id:data.id, texto:t }); if(e2) return toast(errMsg(e2));
+    location.hash = "#ticket/"+data.id; };
+  const { data, error } = await sb.from("tickets").select("*").eq("perfil_id",S.user.id).order("atualizado_em",{ascending:false});
+  if(error) return toast(errMsg(error));
+  const el=$("#tl"); if(!el) return;
+  el.innerHTML = data.length ? data.map(t=>`<a class="card tk" href="#ticket/${t.id}"><div><b>${esc(t.assunto)}</b><div class="small">#${t.id} · atualizado ${dataBR(t.atualizado_em)}</div></div>${tPill(t.status)}</a>`).join("")
+    : `<div class="empty"><b>Nenhum chamado</b>Use “Novo chamado” para falar com a administração do Procura.</div>`;
+}
+async function vTicket(id){
+  const adm=S.perfil.admin, rota=ROTA;
+  main().innerHTML = `<div class="spin">Carregando…</div>`;
+  const { data:t, error } = await sb.from("tickets").select(adm?"*, perfis(id,nome,fantasia,tipo,cnpj,cpf,verificacao)":"*").eq("id",+id).maybeSingle();
+  if(error||!t){ toast("Chamado não encontrado"); location.hash = adm?"#adm-tickets":"#suporte"; return; }
+  const { data:msgs } = await sb.from("ticket_msgs").select("*").eq("ticket_id",t.id).order("id");
+  if(!naRota(rota)) return;
+  const dono=t.perfis, nomeDono = dono ? (dono.fantasia||dono.nome) : "Você";
+  const link = dono ? (dono.tipo==="vendedor" ? `#adm-empresa/${dono.id}` : `#adm-usuario/${dono.id}`) : null;
+  main().innerHTML = `${adm?"":bannerEmpresa()}<div class="top"><div><p class="eyebrow"><a href="${adm?"#adm-tickets":"#suporte"}">${adm?"Tickets":"Chamados"}</a> / #${t.id}</p><h1 style="font-size:26px">${esc(t.assunto)}</h1>
+      ${adm&&dono?`<div class="small" style="margin-top:6px"><a href="${link}"><b>${esc(nomeDono)}</b></a> · ${dono.tipo==="vendedor"?"CNPJ "+esc(maskCNPJ(dono.cnpj||"")):"CPF "+esc(maskCPF(dono.cpf||""))} · ${verifPill(dono.verificacao)}</div>`:""}</div>
+      <div style="display:flex;gap:8px;align-items:center">${tPill(t.status)}${adm?(t.status==="fechado"?`<button class="btn sm" data-ts="aberto">Reabrir</button>`:`<button class="btn sm" data-ts="fechado">Fechar ticket</button>`):""}</div></div>
+    <div class="msgs">${(msgs||[]).map(m=>{ const minha = adm ? m.de_admin : m.autor===S.user.id;
+      return `<div class="msg${minha?" me":""}"><div class="small">${m.de_admin?"Administração do Procura":(adm?esc(nomeDono):"Você")} · ${dataBR(m.criado_em)}</div><div>${esc(m.texto).replace(/\n/g,"<br>")}</div></div>`; }).join("")}</div>
+    ${t.status==="fechado" && !adm ? `<div class="small" style="margin-top:14px">Este chamado foi fechado. Abra um novo em Suporte se precisar.</div>`
+      : `<form class="card form" id="f-resp" style="margin-top:16px"><label class="f" for="r-txt">${adm?"Responder como administração":"Sua mensagem"}</label><textarea class="in" id="r-txt" maxlength="4000"></textarea><div><button class="btn primary" type="submit">Enviar</button></div></form>`}`;
+  const f=$("#f-resp"); if(f) f.onsubmit = async e => { e.preventDefault(); const txt=$("#r-txt").value.trim(); if(!txt) return;
+    const { error } = await sb.from("ticket_msgs").insert({ ticket_id:t.id, texto:txt }); if(error) return toast(errMsg(error)); if(location.hash==="#ticket/"+t.id) route(); };
+  $$("[data-ts]").forEach(b=>b.onclick=async()=>{ const { error }=await sb.rpc("admin_ticket_status",{p_id:t.id,p_status:b.dataset.ts}); if(error) return toast(errMsg(error)); if(location.hash==="#ticket/"+t.id) route(); });
+}
+
+/* =====================================================================
+   ADMINISTRAÇÃO (CPFs de administrador)
+   ===================================================================== */
+function admTabs(at){ return `<div class="seg" style="max-width:640px;margin-bottom:20px">${[["adm","Painel"],["adm-empresas","Empresas"],["adm-usuarios","Usuários"],["adm-tickets","Tickets"]]
+  .map(([k,t])=>`<button type="button" aria-pressed="${k===at}" onclick="location.hash='#${k}'">${t}</button>`).join("")}</div>`; }
+async function vAdm(){
+  main().innerHTML = `<div class="top"><div><p class="eyebrow">Administração</p><h1>Gerenciar o Procura</h1></div></div>${admTabs("adm")}<div id="rs"><div class="spin">Carregando…</div></div>`;
+  const { data:r, error } = await sb.rpc("admin_resumo"); if(error) return toast(errMsg(error)); if(!$("#rs")) return;
+  const T=(n,t,h,hi)=>`<a class="tile${hi&&n?" hi":""}" href="${h}"><span class="ic" style="font:700 20px var(--display)">${n}</span><b>${t}</b></a>`;
+  $("#rs").innerHTML = `<p class="eyebrow">Precisa de ação</p><div class="tiles">
+      ${T(r.empresas_espera,"Empresas na espera","#adm-empresas/em_analise",1)}${T(r.cpf_espera,"CPFs aguardando verificação","#adm-usuarios/em_analise",1)}
+      ${T(r.tickets_abertos,"Tickets aguardando resposta","#adm-tickets/aberto",1)}${T(r.tickets_respondidos,"Tickets respondidos","#adm-tickets/respondido")}</div>
+    <p class="eyebrow" style="margin-top:24px">Cadastros</p><div class="tiles">
+      ${T(r.empresas_aprovadas,"Empresas aprovadas","#adm-empresas/aprovado")}${T(r.empresas_rejeitadas,"Empresas rejeitadas","#adm-empresas/rejeitado")}
+      ${T(r.cpf_aprovados,"CPFs aprovados","#adm-usuarios/aprovado")}${T(r.cpf_sem_documento,"CPFs sem documento","#adm-usuarios/sem_documento")}</div>
+    <p class="small" style="margin-top:18px">${r.itens} itens cadastrados · ${r.pedidos_pagos} pedidos pagos · ${r.cpf_rejeitados} CPFs rejeitados</p>`;
+}
+const FILTROS = [["em_analise","Na espera"],["aprovado","Aprovados"],["rejeitado","Rejeitados"],["","Todos"]];
+async function vAdmEmpresas(st){
+  st = st ?? "em_analise";
+  main().innerHTML = `<div class="top"><div><p class="eyebrow">Administração</p><h1>Empresas</h1></div></div>${admTabs("adm-empresas")}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px"><div class="seg">${FILTROS.map(([k,t])=>`<button type="button" aria-pressed="${k===st}" data-f="${k}">${t}</button>`).join("")}</div>
+      <input class="in" id="q-emp" placeholder="Buscar por nome ou CNPJ" style="max-width:320px"></div><div id="tb"><div class="spin">Carregando…</div></div>`;
+  $$("[data-f]").forEach(b=>b.onclick=()=>location.hash="#adm-empresas/"+b.dataset.f);
+  let tmr; const load = async () => {
+    const { data, error } = await sb.rpc("admin_empresas",{ p_status:st||null, p_busca:$("#q-emp").value||null }); if(error) return toast(errMsg(error)); if(!$("#tb")) return;
+    $("#tb").innerHTML = data.length ? `<table><thead><tr><th>Empresa</th><th>CNPJ</th><th>Cidade</th><th>Status</th><th class="num">Itens</th><th class="num">Vendas</th><th>Cadastro</th></tr></thead><tbody>
+      ${data.map(e=>`<tr class="clk" onclick="location.hash='#adm-empresa/${e.id}'"><td><b>${esc(e.fantasia||e.razao_social)}</b><div class="small">${esc(e.razao_social||"")}</div></td><td class="small">${esc(maskCNPJ(e.cnpj))}</td>
+        <td class="small">${esc(e.cidade||"")}${e.uf?"/"+esc(e.uf):""}</td><td>${verifPill(e.verificacao)}</td><td class="num">${e.itens_ativos}/${e.itens}</td><td class="num">${e.vendas}</td><td class="small">${dataBR(e.criado_em)}</td></tr>`).join("")}</tbody></table>`
+      : `<div class="empty"><b>Nenhuma empresa aqui</b></div>`; };
+  $("#q-emp").oninput = () => { clearTimeout(tmr); tmr=setTimeout(load,300); };
+  load();
+}
+async function vAdmEmpresa(id){
+  const rota=ROTA;
+  main().innerHTML = `<div class="spin">Carregando…</div>`;
+  const [{ data:e }, { data:itens }, { data:tk }] = await Promise.all([
+    sb.from("perfis").select("*").eq("id",id).maybeSingle(),
+    sb.from("produtos").select("*").eq("vendedor",id).order("criado_em",{ascending:false}),
+    sb.from("tickets").select("id,assunto,status").eq("perfil_id",id).order("id")]);
+  if(!naRota(rota)) return;
+  if(!e){ toast("Empresa não encontrada"); location.hash="#adm-empresas"; return; }
+  main().innerHTML = `<div class="top"><div><p class="eyebrow"><a href="#adm-empresas">Empresas</a> /</p><h1>${esc(e.fantasia||e.razao_social)}</h1><div style="margin-top:6px">${verifPill(e.verificacao)} ${e.verificacao_obs?`<span class="small">${esc(e.verificacao_obs)}</span>`:""}</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${e.verificacao!=="aprovado"?`<button class="btn primary" data-v="aprovado">Aprovar empresa</button>`:""}${e.verificacao!=="rejeitado"?`<button class="btn danger" data-v="rejeitado">Rejeitar</button>`:""}${e.verificacao!=="em_analise"?`<button class="btn" data-v="em_analise">Voltar para análise</button>`:""}</div></div>
+    <div class="grid2" style="align-items:start">
+      <div class="card stack"><p class="eyebrow" style="margin:0">Dados</p>
+        <dl><dt>CNPJ</dt><dd>${esc(maskCNPJ(e.cnpj))} · <a href="https://brasilapi.com.br/api/cnpj/v1/${esc(e.cnpj)}" target="_blank" rel="noopener">consultar base pública</a></dd><dt>Razão social</dt><dd>${esc(e.razao_social||"")}</dd><dt>Atividade</dt><dd>${esc(e.atividade||"")}</dd>
+          <dt>Situação</dt><dd>${esc(e.situacao||"")}</dd><dt>Endereço</dt><dd>${esc(e.endereco||"")} · ${esc(e.cidade||"")}/${esc(e.uf||"")} ${esc(e.cep||"")}</dd>
+          <dt>WhatsApp</dt><dd>${e.celular?`<a href="${zap(e.celular)}" target="_blank" rel="noopener">${esc(e.celular)}</a>`:"—"}</dd><dt>E-mail</dt><dd>${esc(e.email||"—")}</dd>
+          <dt>Pagamentos</dt><dd>${esc(pagTxt(e.pagamentos))}</dd><dt>Atende até</dt><dd>${esc(e.raio_entrega_km)} km</dd><dt>Cadastro</dt><dd>${dataBR(e.criado_em)}</dd></dl></div>
+      <div class="card stack"><p class="eyebrow" style="margin:0">Tickets</p>${(tk||[]).map(t=>`<a class="tk" href="#ticket/${t.id}"><span>#${t.id} · ${esc(t.assunto)}</span>${tPill(t.status)}</a>`).join("")||`<span class="small">Nenhum.</span>`}</div>
+    </div>
+    <div class="top" style="margin-top:28px"><h2 style="font-size:22px">Itens cadastrados (${(itens||[]).length})</h2><input class="in" id="q-it" placeholder="Buscar nos itens desta empresa" style="max-width:320px"></div>
+    <div id="its"></div>`;
+  const draw = f => { const rows=(itens||[]).filter(p=>!f || (p.nome+" "+(p.marca||"")+" "+(p.modelo||"")+" "+(p.categoria||"")).toLowerCase().includes(f.toLowerCase()));
+    $("#its").innerHTML = rows.length ? `<table><thead><tr><th></th><th>Item</th><th>Categoria</th><th class="num">Preço</th><th class="num">Estoque</th><th>Ativo</th></tr></thead><tbody>${rows.map(p=>`<tr>
+      <td>${p.fotos[0]?`<img class="thumb" src="${esc(p.fotos[0])}" alt="">`:`<div class="thumb ph">▢</div>`}</td><td><b>${esc(p.nome)}</b><div class="small">${esc([p.marca,p.modelo].filter(Boolean).join(" · "))}</div></td>
+      <td class="small">${esc(p.categoria||"—")}</td><td class="num">${brl(p.preco)} / ${esc(p.unidade)}</td><td class="num">${num(p.estoque)}</td><td>${p.ativo?"sim":"não"}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">Nenhum item${f?" com esse termo":""}.</div>`; };
+  draw(""); $("#q-it").oninput = ev => draw(ev.target.value);
+  $$("[data-v]").forEach(b=>b.onclick=async()=>{ const st=b.dataset.v;
+    const obs = st==="aprovado" ? "" : prompt(st==="rejeitado"?"Motivo da rejeição (a empresa vai ver):":"Observação (opcional):","");
+    if(obs===null) return;
+    const { error }=await sb.rpc("admin_verificar",{ p_id:e.id, p_status:st, p_obs:obs||null }); if(error) return toast(errMsg(error));
+    toast(st==="aprovado"?"Empresa aprovada":"Status atualizado"); if(location.hash.startsWith("#adm-empresa/")) route(); });
+}
+async function vAdmUsuarios(st){
+  st = st ?? "em_analise";
+  const F=[["em_analise","Aguardando verificação"],["aprovado","Aprovados"],["sem_documento","Sem documento"],["rejeitado","Rejeitados"],["","Todos"]];
+  main().innerHTML = `<div class="top"><div><p class="eyebrow">Administração</p><h1>Usuários (CPF)</h1></div></div>${admTabs("adm-usuarios")}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px"><div class="seg">${F.map(([k,t])=>`<button type="button" aria-pressed="${k===st}" data-f="${k}">${t}</button>`).join("")}</div>
+      <input class="in" id="q-us" placeholder="Buscar por nome ou CPF" style="max-width:320px"></div><div id="tb"><div class="spin">Carregando…</div></div>`;
+  $$("[data-f]").forEach(b=>b.onclick=()=>location.hash="#adm-usuarios/"+b.dataset.f);
+  let tmr; const load = async () => {
+    const { data, error } = await sb.rpc("admin_usuarios",{ p_status:st||null, p_busca:$("#q-us").value||null }); if(error) return toast(errMsg(error)); if(!$("#tb")) return;
+    $("#tb").innerHTML = data.length ? `<table><thead><tr><th>Nome</th><th>CPF</th><th>Cidade</th><th>Verificação</th><th class="num">Compras</th><th>Última compra</th><th>Documento enviado</th></tr></thead><tbody>
+      ${data.map(u=>`<tr class="clk" onclick="location.hash='#adm-usuario/${u.id}'"><td><b>${esc(u.nome)}</b>${u.admin?` <span class="pill info">admin</span>`:""}<div class="small">${esc(u.celular||"")}</div></td><td class="small">${esc(maskCPF(u.cpf))}</td>
+        <td class="small">${esc(u.cidade||"")}</td><td>${verifPill(u.verificacao)}</td><td class="num">${u.compras}</td><td class="small">${u.ultima_compra?dataBR(u.ultima_compra):"—"}</td><td class="small">${u.doc_enviado_em?dataBR(u.doc_enviado_em):"—"}</td></tr>`).join("")}</tbody></table>`
+      : `<div class="empty"><b>Nenhum usuário aqui</b></div>`; };
+  $("#q-us").oninput = () => { clearTimeout(tmr); tmr=setTimeout(load,300); };
+  load();
+}
+async function vAdmUsuario(id){
+  const rota=ROTA;
+  main().innerHTML = `<div class="spin">Carregando…</div>`;
+  const [{ data:u }, { data:compras }] = await Promise.all([ sb.from("perfis").select("*").eq("id",id).maybeSingle(), sb.rpc("admin_compras_usuario",{p_id:id}) ]);
+  if(!naRota(rota)) return;
+  if(!u){ toast("Usuário não encontrado"); location.hash="#adm-usuarios"; return; }
+  const d=u.doc_dados||{};
+  let fotoUrl=null; if(u.doc_path){ const { data:s } = await sb.storage.from("documentos").createSignedUrl(u.doc_path, 600); fotoUrl=s?.signedUrl||null; }
+  if(!naRota(rota)) return;
+  const conf = ok => ok===true?`<span class="pill ok">confere</span>`:ok===false?`<span class="pill warn">não confere</span>`:"";
+  main().innerHTML = `<div class="top"><div><p class="eyebrow"><a href="#adm-usuarios">Usuários</a> /</p><h1>${esc(u.nome)}</h1><div style="margin-top:6px">${verifPill(u.verificacao)} ${u.verificacao_obs?`<span class="small">${esc(u.verificacao_obs)}</span>`:""}</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${u.verificacao!=="aprovado"?`<button class="btn primary" data-v="aprovado">Aprovar CPF</button>`:""}${u.verificacao!=="rejeitado"?`<button class="btn danger" data-v="rejeitado">Rejeitar</button>`:""}</div></div>
+    <div class="grid2" style="align-items:start">
+      <div class="card stack"><p class="eyebrow" style="margin:0">Cadastro</p>
+        <dl><dt>CPF</dt><dd>${esc(maskCPF(u.cpf))}</dd><dt>Celular</dt><dd>${u.celular?`<a href="${zap(u.celular)}" target="_blank" rel="noopener">${esc(u.celular)}</a>`:"—"}</dd><dt>E-mail</dt><dd>${esc(u.email||"—")}</dd>
+          <dt>Cidade</dt><dd>${esc(u.cidade||"—")}${u.uf?"/"+esc(u.uf):""}</dd><dt>Cadastro</dt><dd>${dataBR(u.criado_em)}</dd>${u.admin?`<dt>Função</dt><dd>Administrador</dd>`:""}</dl></div>
+      <div class="card stack"><p class="eyebrow" style="margin:0">Documento</p>
+        ${fotoUrl?`<a href="${esc(fotoUrl)}" target="_blank" rel="noopener"><img src="${esc(fotoUrl)}" alt="Documento" style="width:100%;max-height:320px;object-fit:contain;border-radius:10px;background:var(--panel2)"></a>`:`<span class="small">Nenhum documento enviado.</span>`}
+        ${u.doc_path?`<dl><dt>Tipo</dt><dd>${esc(d.tipo||"—")}${d.legivel===false?" · ilegível":""}</dd><dt>Nome lido</dt><dd>${esc(d.nome||"—")} ${conf(d.nome_confere)}</dd>
+          <dt>CPF lido</dt><dd>${esc(d.cpf?maskCPF(d.cpf):"—")} ${conf(d.cpf_confere)}</dd><dt>Nascimento</dt><dd>${esc(d.data_nascimento||"—")}</dd>
+          ${(d.sinais_de_fraude||[]).length?`<dt>Alertas</dt><dd style="color:var(--warn)">${esc(d.sinais_de_fraude.join("; "))}</dd>`:""}<dt>Enviado</dt><dd>${dataBR(u.doc_enviado_em)}</dd></dl>`:""}</div>
+    </div>
+    <h2 style="font-size:22px;margin:28px 0 12px">Últimas compras</h2>
+    ${(compras||[]).length ? `<div class="stack">${compras.map(p=>`<div class="card order"><div class="order-h"><div><b>Pedido #${p.id}</b> <span class="small">${dataBR(p.criado_em)}${p.forma_pagamento?" · "+esc(PAGAMENTOS[p.forma_pagamento]||p.forma_pagamento):""}</span></div><div style="display:flex;gap:10px;align-items:center">${pill(p.status)}<b>${brl(p.total)}</b></div></div>
+      <div class="items">${(p.itens||[]).map(i=>`<div><span>${esc(num(i.qtd))} ${esc(i.unidade)} · ${esc(i.nome)}</span><span class="small">${esc(i.loja)}</span></div>`).join("")}</div></div>`).join("")}</div>`
+      : `<div class="empty">Nenhuma compra.</div>`}`;
+  $$("[data-v]").forEach(b=>b.onclick=async()=>{ const st=b.dataset.v; const obs = st==="rejeitado" ? prompt("Motivo (o usuário vai ver):","") : "";
+    if(obs===null) return; const { error }=await sb.rpc("admin_verificar",{ p_id:u.id, p_status:st, p_obs:obs||(st==="aprovado"?"Verificado pela administração.":null) });
+    if(error) return toast(errMsg(error)); toast("Status atualizado"); if(location.hash.startsWith("#adm-usuario/")) route(); });
+}
+async function vAdmTickets(st){
+  st = st ?? "aberto";
+  const F=[["aberto","Aguardando resposta"],["respondido","Respondidos"],["fechado","Fechados"],["","Todos"]];
+  main().innerHTML = `<div class="top"><div><p class="eyebrow">Administração</p><h1>Tickets</h1></div></div>${admTabs("adm-tickets")}
+    <div class="seg" style="max-width:640px;margin-bottom:14px">${F.map(([k,t])=>`<button type="button" aria-pressed="${k===st}" data-f="${k}">${t}</button>`).join("")}</div><div id="tl" class="stack"><div class="spin">Carregando…</div></div>`;
+  $$("[data-f]").forEach(b=>b.onclick=()=>location.hash="#adm-tickets/"+b.dataset.f);
+  let q=sb.from("tickets").select("*, perfis(nome,fantasia,tipo)").order("atualizado_em",{ascending:false}).limit(300); if(st) q=q.eq("status",st);
+  const { data, error } = await q; if(error) return toast(errMsg(error)); if(!$("#tl")) return;
+  $("#tl").innerHTML = data.length ? data.map(t=>`<a class="card tk" href="#ticket/${t.id}"><div><b>${esc(t.assunto)}</b><div class="small">#${t.id} · ${esc(t.perfis?.fantasia||t.perfis?.nome||"")} · ${t.tipo==="cadastro_empresa"?"cadastro de empresa":"suporte"} · ${dataBR(t.atualizado_em)}</div></div>${tPill(t.status)}</a>`).join("")
+    : `<div class="empty"><b>Nenhum ticket aqui</b></div>`;
 }
 
 boot().catch(e=>{ console.error(e); $("#root").innerHTML=`<div class="empty" style="margin:40px">Não consegui abrir o Procura. ${esc(errMsg(e))}</div>`; });

@@ -6,6 +6,7 @@
 
 # documentação, banco e rascunhos ficam só na máquina (repo é público)
 *.md
+CLAUDE.md
 supabase/
 _arquivo/
 
